@@ -48,7 +48,7 @@ const cube=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(200,200,200)
 const shell=new T.Mesh(new T.BoxGeometry(200,200,200),new T.MeshBasicMaterial({color:0x3c8fa8,transparent:true,opacity:.025,side:T.BackSide,depthWrite:false}));scene.add(shell);
 const cellGeo=new T.SphereGeometry(1,16,12),srcGeo=new T.IcosahedronGeometry(4,1);
 const raycaster=new T.Raycaster(),pointer=new T.Vector2();
-let cells=[],sources=[],walls=[],nextId=1,day=0,dead=0,running=true,last=performance.now(),selected=null,follow=false,xray=false,autoEvents=true,pending=null,lastAsk=-100,askedId=0,frameN=0,orbit={theta:.8,phi:1.1,dist:345},target=new T.Vector3(),drag=null;
+let cells=[],sources=[],walls=[],nextId=1,day=0,dead=0,worldStarted=false,running=true,last=performance.now(),selected=null,follow=false,xray=false,autoEvents=true,pending=null,lastAsk=-100,askedId=0,frameN=0,orbit={theta:.8,phi:1.1,dist:700},target=new T.Vector3(),drag=null;
 const stats=COLORS.map(()=>({dead:0,conversions:0})),knowledge=['жгутик: скорость','панцирь: защита','отросток: атака','хеморецептор: поиск','кооперация: окружение','экономия: эффективность','ложный манёвр: стратегия','разведка: стратегия'];
 const randPos=()=>new T.Vector3(rnd(-85,85),rnd(-85,85),rnd(-85,85));
 const makeMat=(c,opacity=1)=>new T.MeshPhongMaterial({color:c,emissive:c,emissiveIntensity:.12,transparent:opacity<1,opacity,shininess:90});
@@ -69,7 +69,7 @@ function updateShape(a){
 function removeCell(a){scene.remove(a.mesh);a.mesh.traverse(o=>{if(o.geometry&&o!==a.mesh)o.geometry.dispose();if(o.material)o.material.dispose()});a.mesh.geometry=cellGeo;cells.splice(cells.indexOf(a),1);if(selected===a){selected=null;follow=false}stats[a.kind].dead++;dead++}
 function spawnEnergy(){
  const pos=randPos(),mesh=new T.Mesh(srcGeo,new T.MeshPhongMaterial({color:0xffd15a,emissive:0xe5a334,emissiveIntensity:.7}));mesh.position.copy(pos);scene.add(mesh);
- const s={id:Date.now()+Math.random(),pos,mesh,units:10};sources.push(s);event('Источник энергии появился в случайной точке куба (10 единиц)');return s
+ const s={id:Date.now()+Math.random(),pos,mesh,units:10};sources.push(s);worldStarted=true;event('Источник энергии появился в случайной точке куба (10 единиц)');return s
 }
 function addWall(){
  const horizontal=Math.random()<.5,geo=new T.BoxGeometry(horizontal?rnd(35,75):5,rnd(25,60),horizontal?5:rnd(35,75));
@@ -77,7 +77,7 @@ function addWall(){
 }
 function removeWalls(){walls.forEach(m=>{scene.remove(m);m.geometry.dispose();m.material.dispose()});walls=[]}
 function reset(){
- cells.forEach(a=>{scene.remove(a.mesh);a.mesh.traverse(o=>{if(o.material)o.material.dispose()})});cells=[];sources.forEach(s=>{scene.remove(s.mesh);s.mesh.material.dispose()});sources=[];removeWalls();nextId=1;day=0;dead=0;pending=null;selected=null;follow=false;lastAsk=-100;askedId=0;stats.forEach(s=>{s.dead=0;s.conversions=0});$('speech').textContent='💬 Клетки пока молчат…';$('yes').hidden=$('no').hidden=true;$('log').textContent='';for(let i=0;i<10;i++)addCell(i);event('Созданы 10 видов с разными стартовыми преимуществами');running=true;$('pause').textContent='⏸ Пауза'
+ cells.forEach(a=>{scene.remove(a.mesh);a.mesh.traverse(o=>{if(o.material)o.material.dispose()})});cells=[];sources.forEach(s=>{scene.remove(s.mesh);s.mesh.material.dispose()});sources=[];removeWalls();nextId=1;day=0;dead=0;worldStarted=false;pending=null;selected=null;follow=false;lastAsk=-100;askedId=0;stats.forEach(s=>{s.dead=0;s.conversions=0});$('speech').textContent='💬 Клетки пока молчат…';$('yes').hidden=$('no').hidden=true;$('log').textContent='';for(let i=0;i<10;i++)addCell(i);event('Созданы 10 видов с разными стартовыми преимуществами. Время остановлено до первого источника энергии');running=true;$('pause').textContent='⏸ Пауза'
 }
 function chooseTarget(a){
  let best=null,score=-Infinity;
@@ -100,6 +100,7 @@ function evolve(a){
  updateShape(a);if(a===selected||Math.random()<.06)event('Клетка №'+a.id+' улучшила '+key+' на 10%, изучила «'+concept+'»')
 }
 function tick(dt){
+ if(!worldStarted)return; // No ageing or starvation before the observer places the first energy source.
  day+=dt;
  for(const a of [...cells]){
   a.age+=dt;a.attackCooldown=Math.max(0,a.attackCooldown-dt);
@@ -137,7 +138,7 @@ $('energy').onclick=spawnEnergy;
 $('walls').onclick=()=>{if(walls.length){removeWalls();$('walls').textContent='🧱 Поставить стены'}else{for(let i=0;i<8;i++)addWall();$('walls').textContent='🚧 Убрать стены'}};
 $('pause').onclick=()=>{running=!running;$('pause').textContent=running?'⏸ Пауза':'▶ Продолжить'};
 $('reset').onclick=reset;
-$('overview').onclick=()=>{follow=false;selected=null;target.set(0,0,0);orbit.dist=345};
+$('overview').onclick=()=>{follow=false;selected=null;target.set(0,0,0);orbit.dist=fitCubeDistance()};
 $('follow').onclick=()=>{if(selected)follow=!follow;else event('Для слежения сначала выберите клетку')};
 $('xray').onclick=()=>{xray=!xray;for(const a of cells){a.mesh.material.depthTest=!xray;a.mesh.material.transparent=xray;a.mesh.material.opacity=xray?.82:1}for(const w of walls)w.material.opacity=xray?.08:.34;$('xray').textContent='◉ Рентген: '+(xray?'вкл.':'выкл.')};
 $('events').onclick=()=>{autoEvents=!autoEvents;$('events').textContent='✦ События: '+(autoEvents?'вкл.':'выкл.')};
@@ -147,7 +148,8 @@ function updateUI(){
  $('species').replaceChildren(...COLORS.map((c,i)=>{const d=document.createElement('div');d.className='species';const sw=document.createElement('i');sw.className='dot';sw.style.background=c;const name=document.createElement('span');name.textContent=(i+1)+'. '+NAMES[i]+' · живых '+counts[i];const value=document.createElement('span');value.textContent='☠ '+stats[i].dead+' · ⇄ '+stats[i].conversions;d.append(sw,name,value);return d}));
  if(selected&&cells.includes(selected)){const a=selected;$('detail').textContent='№'+a.id+' · '+NAMES[a.kind]+'\nВозраст '+a.age.toFixed(1)+' / '+a.life.toFixed(1)+'\nЭнергия '+a.energy.toFixed(2)+'\nОпыт '+a.experience.toFixed(1)+'\nРешение: '+a.goal+'\nУлучшения: '+a.genes+'\nКонечность: '+(a.arm?'да':'нет')+' · панцирь: '+(a.shell?'да':'нет')+'\n'+Object.entries(a.traits).map(([k,v])=>k+': ×'+v.toFixed(2)).join('\n')+'\nЗнания: '+(a.knowledge.join(', ')||'пока нет')}
 }
-function resize(){const w=sceneEl.clientWidth,h=sceneEl.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+function fitCubeDistance(){const vFov=55*Math.PI/180;const hFov=2*Math.atan(Math.tan(vFov/2)*camera.aspect);return 190/Math.sin(Math.min(vFov,hFov)/2)*1.18}
+function resize(){const w=sceneEl.clientWidth,h=sceneEl.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();if(!follow)orbit.dist=Math.max(orbit.dist,fitCubeDistance())}
 new ResizeObserver(resize).observe(sceneEl);resize();
 function setCamera(){if(follow&&selected&&cells.includes(selected))target.lerp(selected.mesh.position,.08);const ph=clamp(orbit.phi,.12,Math.PI-.12);camera.position.set(target.x+orbit.dist*Math.sin(ph)*Math.cos(orbit.theta),target.y+orbit.dist*Math.cos(ph),target.z+orbit.dist*Math.sin(ph)*Math.sin(orbit.theta));camera.lookAt(target)}
 renderer.domElement.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,moved:false};renderer.domElement.setPointerCapture(e.pointerId)});
@@ -156,7 +158,7 @@ renderer.domElement.addEventListener('pointerup',e=>{if(!drag)return;const moved
 renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();orbit.dist=clamp(orbit.dist*Math.exp(e.deltaY*.001),35,650)},{passive:false});
 let pinch=0;renderer.domElement.addEventListener('touchmove',e=>{if(e.touches.length===2){const a=e.touches[0],b=e.touches[1],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(pinch)orbit.dist=clamp(orbit.dist*pinch/d,35,650);pinch=d}},{passive:true});renderer.domElement.addEventListener('touchend',()=>pinch=0);
 function frame(now){requestAnimationFrame(frame);const dt=Math.min(.045,(now-last)/1000);last=now;if(running&&cells.length)tick(dt*.85);if(follow&&(!selected||!cells.includes(selected)))follow=false;setCamera();renderer.render(scene,camera);if(frameN++%16===0)updateUI()}
-reset();requestAnimationFrame(frame);
+reset();orbit.dist=fitCubeDistance();requestAnimationFrame(frame);
 })();
 bootStatus.textContent='✓ 3D работает — клетки созданы';
 setTimeout(()=>{if(bootStatus.textContent.startsWith('✓'))bootStatus.remove()},4000);
