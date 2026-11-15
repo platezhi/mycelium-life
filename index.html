@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id),canvas=$('world'),ctx=canvas.getContext(
 let cell,sources=[],branches=[],nodes=[],particles=[],nextSourceId=0,angle=.7,pitch=.38,zoom=1,drag=null,pointers=new Map(),lastPinch=0,last=performance.now(),uiTimer=0,requestTime=0,prevMood='',lastMessage='',messageIndex=0;
 const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z),randPos=()=>({x:rnd(-75,75),y:rnd(-75,75),z:rnd(-75,75)});
 function say(t){if(t!==lastMessage){$('words').textContent=t;lastMessage=t}}
-function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,mass:1,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10),wander:{x:rnd(-65,65),y:rnd(-65,65),z:rnd(-65,65)},nextWander:0};sources=[];branches=[];nodes=[];particles=Array.from({length:46},(_,i)=>{const t=i*2.399963,rad=Math.sqrt((i+.5)/46)*9;return{x:Math.cos(t)*rad,y:Math.sin(t)*rad,z:Math.sin(t*1.7)*rad*.5,vx:0,vy:0,vz:0}});nextSourceId=0;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
+function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,mass:1,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10),wander:{x:rnd(-65,65),y:rnd(-65,65),z:rnd(-65,65)},nextWander:0};sources=[];branches=[];nodes=[];particles=Array.from({length:46},(_,i)=>{const t=i*2.399963,rad=Math.sqrt((i+.5)/46)*5.8;return{x:Math.cos(t)*rad,y:Math.sin(t)*rad,z:Math.sin(t*1.7)*rad*.5,vx:0,vy:0,vz:0}});nextSourceId=0;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
 function project(p){const x=p.x*Math.cos(angle)-p.z*Math.sin(angle),z=p.x*Math.sin(angle)+p.z*Math.cos(angle),y=p.y*Math.cos(pitch)-z*Math.sin(pitch);const scale=Math.min(w,h)*.00255*zoom;return{x:w/2+x*scale,y:h/2-y*scale,scale}}
 function line(a,b,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
 function draw(){ctx.clearRect(0,0,w,h);const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});const pp=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++){const d=dist(corners[i],corners[j]);if(Math.abs(d-200)<.01)line(pp[i],pp[j],'rgba(130,207,226,.48)',1)}
@@ -19,13 +19,13 @@ if(!draw.skin||draw.skin.width!==sw||draw.skin.height!==sh){draw.skin=document.c
 const img=draw.skinCtx.createImageData(sw,sh),pix=img.data;
 const points=particles.map(p=>{const q=project(p);return{x:q.x*density,y:q.y*density}});
 const scale=Math.min(w,h)*.00255*zoom*density;
-const sigma=clamp(scale*15,4,11),inv=1/(2*sigma*sigma),limit=sigma*3;
+const sigma=clamp(scale*11,3.4,8.5),inv=1/(2*sigma*sigma),limit=sigma*3;
 const values=new Float32Array(sw*sh);
 const material=cell.mass*particles.length/46;
 for(const p of points){const minX=Math.max(0,Math.floor(p.x-limit)),maxX=Math.min(sw-1,Math.ceil(p.x+limit)),minY=Math.max(0,Math.floor(p.y-limit)),maxY=Math.min(sh-1,Math.ceil(p.y+limit));
  for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++){const dx=x-p.x,dy=y-p.y;values[y*sw+x]+=Math.exp(-(dx*dx+dy*dy)*inv)*material}
 }
-const threshold=2.1,fade=.35+.65*clamp(cell.energy/65,0,1);
+const threshold=2.65,fade=.35+.65*clamp(cell.energy/65,0,1);
 for(let y=1;y<sh-1;y++)for(let x=1;x<sw-1;x++){const i=y*sw+x,v=values[i],alpha=clamp((v-threshold)*1.3+.5,0,1);if(alpha<=0)continue;
  const gx=values[i+1]-values[i-1],gy=values[i+sw]-values[i-sw];
  const light=clamp(.63-gx*.11-gy*.17,0,1),inside=clamp((v-threshold)*.18,0,1);
@@ -51,17 +51,21 @@ function step(dt){
   const p=particles[i];p.x+=travel.x;p.y+=travel.y;p.z+=travel.z;
   for(let j=i+1;j<count;j++){
    const q=particles[j],x=q.x-p.x,y=q.y-p.y,z=q.z-p.z,r=Math.hypot(x,y,z)||.001;
-   if(r<19){const push=(r-11)*.035;forces[i].x+=x/r*push;forces[i].y+=y/r*push;forces[i].z+=z/r*push;forces[j].x-=x/r*push;forces[j].y-=y/r*push;forces[j].z-=z/r*push}
+   if(r<14){const push=(r-7)*.045;forces[i].x+=x/r*push;forces[i].y+=y/r*push;forces[i].z+=z/r*push;forces[j].x-=x/r*push;forces[j].y-=y/r*push;forces[j].z-=z/r*push}
   }
  }
  for(let i=0;i<count;i++){
   const p=particles[i],phase=i*2.399963,fx=forces[i].x,fy=forces[i].y,fz=forces[i].z;
   // Weak attraction to the organism's moving centre prevents detached limbs.
-  const ax=fx+(cell.p.x-p.x)*.018+Math.sin(cell.age*.42+phase)*.09;
-  const ay=fy+(cell.p.y-p.y)*.018+Math.cos(cell.age*.35+phase*1.3)*.09;
-  const az=fz+(cell.p.z-p.z)*.018+Math.sin(cell.age*.29+phase*.7)*.06;
+  const ax=fx+(cell.p.x-p.x)*.09+Math.sin(cell.age*.42+phase)*.09;
+  const ay=fy+(cell.p.y-p.y)*.09+Math.cos(cell.age*.35+phase*1.3)*.09;
+  const az=fz+(cell.p.z-p.z)*.09+Math.sin(cell.age*.29+phase*.7)*.06;
   p.vx=(p.vx+ax*dt)*Math.exp(-2.2*dt);p.vy=(p.vy+ay*dt)*Math.exp(-2.2*dt);p.vz=(p.vz+az*dt)*Math.exp(-2.2*dt);
   p.x=clamp(p.x+p.vx*dt,-94,94);p.y=clamp(p.y+p.vy*dt,-94,94);p.z=clamp(p.z+p.vz*dt,-94,94);
+  // A connected soft cell: no material parcel may drift away and become a separate island.
+  const rx=p.x-cell.p.x,ry=p.y-cell.p.y,rz=p.z-cell.p.z,rr=Math.hypot(rx,ry,rz);
+  const maxR=8.5*Math.sqrt(cell.mass);
+  if(rr>maxR){const k=maxR/rr;p.x=cell.p.x+rx*k;p.y=cell.p.y+ry*k;p.z=cell.p.z+rz*k;p.vx*=.5;p.vy*=.5;p.vz*=.5}
  }
  // Only physical proximity of the cohesive organism permits absorption.
  for(const source of [...sources]){
