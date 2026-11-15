@@ -39,7 +39,7 @@ for(let i=0;i<n;i++){
 for(let y=1;y<sh-1;y++)for(let x=1;x<sw-1;x++){
  const dx=x+.5-cx,dy=y+.5-cy,theta=(Math.atan2(dy,dx)+2*Math.PI)%(2*Math.PI);
  const t=theta*n/(2*Math.PI),i=Math.floor(t)%n,f=t-Math.floor(t);
- const boundary=base*normalizer*(radii[i]*(1-f)+radii[(i+1)%n]*f);
+ const boundary=radii[i]*(1-f)+radii[(i+1)%n]*f;
  const d=Math.hypot(dx,dy)-boundary,alpha=clamp(.5-d/1.25,0,1);
  if(alpha<=0)continue;
  const u=dx/Math.max(1,boundary),v=dy/Math.max(1,boundary),light=clamp(.68-.21*u-.24*v,0,1);
