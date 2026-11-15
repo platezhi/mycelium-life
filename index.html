@@ -134,7 +134,9 @@ function step(dt){
    a.progress=(a.progress||0)+(feeding?dt*8:0);
    if(a.progress>=val('repro')&&a.energy>.8&&cells.length+next.length<500){
      a.progress-=val('repro');a.energy/=2;
-     next.push({...a,id:nextId++,age:0,progress:0,generation:(a.generation||1)+1,x:clamp(a.x+Math.random()*12-6,8,752),y:clamp(a.y+Math.random()*12-6,8,512),heading:Math.random()*Math.PI*2,fedOnce:a.fedOnce, fedSources:[...(a.fedSources||[])],color:a.color,birthDay:day,pushedUntil:0});born++;
+     const p={x:clamp(a.x+Math.random()*12-6,10,750),y:clamp(a.y+Math.random()*12-6,10,510)};
+     if(blocked(p.x,p.y,10)){p.x=a.x;p.y=a.y}
+     next.push({...a,id:nextId++,age:0,progress:0,generation:(a.generation||1)+1,...p,heading:Math.random()*Math.PI*2,fedOnce:a.fedOnce, fedSources:[...(a.fedSources||[])],color:a.color,birthDay:day,pushedUntil:0});born++;
    }
    if(a.age>=val('life')||a.energy<=0){dead++;continue}
    next.push(a);
@@ -146,8 +148,8 @@ async function load(){
  running=false;
  try{
   const r=await fetch('./state.json?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);
-  const s=await r.json();cells=s.cells.map(a=>({...a,known:null,age:a.age||0,fedOnce:false,fedSources:[],color:newColor(),birthDay:day-(a.age||0),pushedUntil:0}));
-  day=s.day||0;born=s.born||0;dead=s.dead||0;nextId=s.next_id||101;sources=[];sourceVersion++;
+  const s=await r.json();day=s.day||0;cells=s.cells.map(a=>({...a,known:null,age:a.age||0,fedOnce:false,fedSources:[],color:newColor(),birthDay:day-(a.age||0),pushedUntil:0}));
+ born=s.born||0;dead=s.dead||0;nextId=s.next_id||101;sources=[];sourceVersion++;
   $('updated').textContent='Сохранено: '+new Date(s.updated).toLocaleString('ru-RU');
   $('mode').textContent='Загружен снимок GitHub. Добавь источники и нажми «Начать локальную симуляцию».';
   draw();
