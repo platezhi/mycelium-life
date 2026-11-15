@@ -64,7 +64,7 @@ function step(dt){
      a.age=Math.max(0,a.age-2*dt/50);
    }
    a.energy=clamp((a.energy??1)+gain-(.10+(moved?val('cost')/100:0))*dt/50,0,5);
-   a.progress=(a.progress||0)+(feeding?dt*4:0);
+   a.progress=(a.progress||0)+(feeding?dt*8:0);
    if(a.progress>=val('repro')&&a.energy>.8&&cells.length+next.length<500){
      a.progress-=val('repro');a.energy/=2;
      next.push({...a,id:nextId++,age:0,progress:0,generation:(a.generation||1)+1,x:clamp(a.x+Math.random()*12-6,8,752),y:clamp(a.y+Math.random()*12-6,8,512),heading:Math.random()*Math.PI*2,fedOnce:false,color:a.color});born++;
