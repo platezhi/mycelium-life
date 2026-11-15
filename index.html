@@ -42,7 +42,7 @@ const sceneEl=$('scene');
 
 const T=THREE,scene=new T.Scene(),camera=new T.OrthographicCamera(-200,200,200,-200,.1,2000);
 const renderer=new T.WebGLRenderer({antialias:true,alpha:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));sceneEl.prepend(renderer.domElement);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.25));sceneEl.prepend(renderer.domElement);
 scene.add(new T.AmbientLight(0xb5e8ff,1.2));const light=new T.PointLight(0xffffff,85);light.position.set(90,120,100);scene.add(light);
 const cube=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(200,200,200)),new T.LineBasicMaterial({color:0x6dc6e4,transparent:true,opacity:.7}));scene.add(cube);
 const shell=new T.Mesh(new T.BoxGeometry(200,200,200),new T.MeshBasicMaterial({color:0x3c8fa8,transparent:true,opacity:.025,side:T.BackSide,depthWrite:false}));scene.add(shell);
@@ -56,7 +56,7 @@ function event(s){const p=document.createElement('div');p.textContent='День 
 function traits(i){const v={speed:1,armor:1,sensing:1,efficiency:1,learning:1,attack:1,cooperation:1};v[KEYS[i]]=1.3;return v}
 function addCell(kind,pos,parent){
  const mesh=new T.Mesh(cellGeo,makeMat(COLORS[kind]));mesh.scale.setScalar(4.2);mesh.position.copy(pos||randPos());scene.add(mesh);
- const a={id:nextId++,kind,mesh,energy:parent?parent.energy*.45:11,age:0,life:parent?parent.life:65,traits:parent?{...parent.traits}:traits(kind),fed:new Set(),experience:parent?parent.experience*.3:0,genes:parent?parent.genes:0,arm:parent?parent.arm:false,shell:parent?parent.shell:false,knowledge:parent?[...parent.knowledge]:[],target:null,velocity:new T.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).normalize(),goal:'исследование',asked:false,attackCooldown:0};
+ const a={id:nextId++,kind,mesh,energy:parent?Math.max(5,parent.energy*.4):11,age:0,life:parent?parent.life:180,traits:parent?{...parent.traits}:traits(kind),fed:new Set(),experience:parent?parent.experience*.3:0,genes:parent?parent.genes:0,arm:parent?parent.arm:false,shell:parent?parent.shell:false,knowledge:parent?[...parent.knowledge]:[],target:null,velocity:new T.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).normalize(),goal:'исследование',asked:false,attackCooldown:0};
  mesh.userData.cell=a;cells.push(a);updateShape(a);return a
 }
 function updateShape(a){
@@ -85,14 +85,14 @@ function chooseTarget(a){
  return best
 }
 function evolve(a){
- if(a.energy<2.5||a.experience<1)return;
+ if(a.energy<6.2||a.experience<1)return;
  const rivals=cells.filter(b=>b.kind!==a.kind&&b.mesh.position.distanceTo(a.mesh.position)<40).length;
  const own=cells.filter(b=>b.kind===a.kind&&b.mesh.position.distanceTo(a.mesh.position)<40).length;
  const choice=rivals>own?'armor':rivals>0?'attack':a.genes%3===0?'attack':a.genes%3===1?'armor':sources.length?'speed':'sensing';
  const possible=['speed','armor','sensing','efficiency','learning','attack','cooperation'];
  const key=Math.random()<.35?possible[Math.floor(Math.random()*possible.length)]:choice;
- const cost=1.4/a.traits.efficiency;
- if(a.traits[key]>=5||a.energy<cost)return;
+ const cost=1.2/a.traits.efficiency;
+ if(a.traits[key]>=5||a.energy-cost<5)return;
  a.energy-=cost;a.experience-=1;a.traits[key]=Math.min(5,+(a.traits[key]*1.1).toFixed(3));a.genes++;
  const concept=knowledge[Math.floor(Math.random()*knowledge.length)];if(!a.knowledge.includes(concept))a.knowledge.push(concept);
  if(key==='armor'&&a.traits.armor>=1.3)a.shell=true;
@@ -104,13 +104,13 @@ function tick(dt){
  day+=dt;
  for(const a of [...cells]){
   a.age+=dt;a.attackCooldown=Math.max(0,a.attackCooldown-dt);
-  a.energy-=dt*(.085+.012*a.traits.speed+.012*(a.arm?1:0)+.012*(a.shell?1:0))/a.traits.efficiency;
+  a.energy-=dt*(.045+.007*a.traits.speed+.007*(a.arm?1:0)+.007*(a.shell?1:0))/a.traits.efficiency;
   if(a.age>a.life||a.energy<=0){removeCell(a);continue}
   if(a.experience>=1)evolve(a);
   let dest=chooseTarget(a);a.target=dest;
   const p=a.mesh.position;
-  const enemies=cells.filter(b=>b.kind!==a.kind&&p.distanceTo(b.mesh.position)<35);
-  const friends=cells.filter(b=>b.kind===a.kind&&b!==a&&p.distanceTo(b.mesh.position)<40);
+  const enemies=[],friends=[];
+  for(const b of cells){if(b===a)continue;const d2=p.distanceToSquared(b.mesh.position);if(b.kind!==a.kind&&d2<1225)enemies.push(b);else if(b.kind===a.kind&&d2<1600)friends.push(b)}
   if(dest){a.goal='поиск энергии';a.velocity.addScaledVector(dest.pos.clone().sub(p).normalize(),dt*14)}
   else if(enemies.length&&friends.length>=3){a.goal='окружение';a.velocity.addScaledVector(enemies[0].mesh.position.clone().sub(p).normalize(),dt*14)}
   else{a.goal='разведка';a.velocity.add(new T.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).multiplyScalar(dt*.6))}
@@ -118,16 +118,16 @@ function tick(dt){
   const step=dt*15*a.traits.speed;
   p.addScaledVector(a.velocity,step);
   for(const axis of ['x','y','z']){if(p[axis]>94){p[axis]=94;a.velocity[axis]*=-1}if(p[axis]<-94){p[axis]=-94;a.velocity[axis]*=-1}}
-  for(const w of walls){const box=new T.Box3().setFromObject(w);if(box.distanceToPoint(p)<4){p.addScaledVector(a.velocity,-step*2);a.velocity.multiplyScalar(-1)}}
+  for(const w of walls){const box=w.userData.bounds||(w.userData.bounds=new T.Box3().setFromObject(w));if(box.distanceToPoint(p)<4){p.addScaledVector(a.velocity,-step*2);a.velocity.multiplyScalar(-1)}}
   if(dest&&p.distanceTo(dest.pos)<11&&dest.units>0&&!a.fed.has(dest.id)){
-   dest.units--;a.fed.add(dest.id);a.energy=Math.min(16,a.energy+4.5);a.experience+=2*a.traits.learning;a.goal='получена энергия → знания';a.target=null;
+   dest.units--;a.fed.add(dest.id);a.energy=Math.min(16,a.energy+4.5);a.life=Math.min(300,a.life+15);a.experience+=2*a.traits.learning;a.goal='получена энергия → знания';a.target=null;
    if(dest.units<=0){scene.remove(dest.mesh);dest.mesh.material.dispose();sources.splice(sources.indexOf(dest),1)}
   }
   if(enemies.length&&friends.length>=3&&a.attackCooldown===0){
    const victim=enemies[0],surround=cells.filter(b=>b.kind===a.kind&&b.mesh.position.distanceTo(victim.mesh.position)<16);
    if(surround.length>=5){victim.kind=a.kind;victim.mesh.material.color.set(COLORS[a.kind]);victim.mesh.material.emissive.set(COLORS[a.kind]);victim.traits={...victim.traits};victim.fed.clear();victim.arm=false;victim.shell=false;updateShape(victim);stats[a.kind].conversions++;a.attackCooldown=1;event('Вид '+(a.kind+1)+' ассимилировал клетку №'+victim.id)}
   }
-  if(a.energy>10&&a.age>2&&cells.length<250&&Math.random()<dt*.16){a.energy*=.55;addCell(a.kind,p.clone().add(new T.Vector3(rnd(-5,5),rnd(-5,5),rnd(-5,5))),a)}
+  if(a.energy>12&&a.age>2&&cells.length<90&&Math.random()<dt*.045){a.energy*=.65;addCell(a.kind,p.clone().add(new T.Vector3(rnd(-5,5),rnd(-5,5),rnd(-5,5))),a)}
  }
  if(day-lastAsk>2&&!pending&&cells.length){const eligible=cells.filter(a=>!a.asked&&a.age<a.life-1).sort((a,b)=>a.id-b.id);const a=eligible.find(a=>a.id>askedId)||eligible[0];if(a){a.asked=true;askedId=a.id;a.life=Math.max(a.age+.2,a.life-1);pending=a;$('speech').textContent='💬 Клетка №'+a.id+': «Дашь мне энергию для знаний?» (−1 год жизни)';$('yes').hidden=$('no').hidden=false}}
 }
@@ -144,7 +144,7 @@ $('xray').onclick=()=>{xray=!xray;for(const a of cells){a.mesh.material.depthTes
 $('events').onclick=()=>{autoEvents=!autoEvents;$('events').textContent='✦ События: '+(autoEvents?'вкл.':'выкл.')};
 function updateUI(){
  $('count').textContent=cells.length;$('day').textContent=day.toFixed(1);$('sources').textContent=sources.length;$('dead').textContent=dead;
- const counts=COLORS.map((_,i)=>cells.filter(a=>a.kind===i).length);
+ const counts=Array(10).fill(0);for(const a of cells)counts[a.kind]++;
  $('species').replaceChildren(...COLORS.map((c,i)=>{const d=document.createElement('div');d.className='species';const sw=document.createElement('i');sw.className='dot';sw.style.background=c;const name=document.createElement('span');name.textContent=(i+1)+'. '+NAMES[i]+' · живых '+counts[i];const value=document.createElement('span');value.textContent='☠ '+stats[i].dead+' · ⇄ '+stats[i].conversions;d.append(sw,name,value);return d}));
  if(selected&&cells.includes(selected)){const a=selected;$('detail').textContent='№'+a.id+' · '+NAMES[a.kind]+'\nВозраст '+a.age.toFixed(1)+' / '+a.life.toFixed(1)+'\nЭнергия '+a.energy.toFixed(2)+'\nОпыт '+a.experience.toFixed(1)+'\nРешение: '+a.goal+'\nУлучшения: '+a.genes+'\nКонечность: '+(a.arm?'да':'нет')+' · панцирь: '+(a.shell?'да':'нет')+'\n'+Object.entries(a.traits).map(([k,v])=>k+': ×'+v.toFixed(2)).join('\n')+'\nЗнания: '+(a.knowledge.join(', ')||'пока нет')}
 }
@@ -157,7 +157,7 @@ renderer.domElement.addEventListener('pointermove',e=>{if(!drag)return;const dx=
 renderer.domElement.addEventListener('pointerup',e=>{if(!drag)return;const moved=drag.moved;drag=null;if(moved)return;const rect=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);raycaster.setFromCamera(pointer,camera);const hits=raycaster.intersectObjects(cells.map(a=>a.mesh),false);if(hits.length){selected=hits[0].object.userData.cell;updateUI()}});
 renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();orbit.dist=clamp(orbit.dist*Math.exp(e.deltaY*.001),.4,4)},{passive:false});
 let pinch=0;renderer.domElement.addEventListener('touchmove',e=>{if(e.touches.length===2){const a=e.touches[0],b=e.touches[1],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(pinch)orbit.dist=clamp(orbit.dist*pinch/d,.4,4);pinch=d}},{passive:true});renderer.domElement.addEventListener('touchend',()=>pinch=0);
-function frame(now){requestAnimationFrame(frame);const dt=Math.min(.045,(now-last)/1000);last=now;if(running&&cells.length)tick(dt*.85);if(follow&&(!selected||!cells.includes(selected)))follow=false;setCamera();renderer.render(scene,camera);if(frameN++%16===0)updateUI()}
+function frame(now){requestAnimationFrame(frame);if(now-last<32)return;const dt=Math.min(.05,(now-last)/1000);last=now;if(running&&cells.length)tick(dt*.85);if(follow&&(!selected||!cells.includes(selected)))follow=false;setCamera();renderer.render(scene,camera);if(frameN++%45===0)updateUI()}
 reset();orbit.dist=fitCubeDistance();requestAnimationFrame(frame);
 })();
 bootStatus.textContent='✓ 3D работает — клетки созданы';
