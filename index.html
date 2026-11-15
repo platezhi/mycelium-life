@@ -12,8 +12,30 @@ function project(p){const x=p.x*Math.cos(angle)-p.z*Math.sin(angle),z=p.x*Math.s
 function line(a,b,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
 function draw(){ctx.clearRect(0,0,w,h);const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});const pp=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++){const d=dist(corners[i],corners[j]);if(Math.abs(d-200)<.01)line(pp[i],pp[j],'rgba(130,207,226,.48)',1)}
 for(const source of sources){const s=project(source.p),r=4+Math.sqrt(source.energy)*.65+Math.sin(cell.age*5)*1.2;ctx.shadowColor='#ffe477';ctx.shadowBlur=18;ctx.strokeStyle='#ffdf72';ctx.lineWidth=2;ctx.beginPath();ctx.arc(s.x,s.y,r,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#fff0a5';ctx.beginPath();ctx.arc(s.x,s.y,Math.max(1.5,source.energy/15),0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
-for(const branch of branches){const a=project(branch.origin),tip=project(branch.tip);const width=(3+cell.size*1.1)*zoom;ctx.globalAlpha=.4+.6*clamp(cell.energy/65,0,1);ctx.lineCap='round';ctx.strokeStyle='#79e9ce';ctx.lineWidth=width;ctx.shadowColor='#4fd7bb';ctx.shadowBlur=8;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(tip.x,tip.y);ctx.stroke();ctx.shadowBlur=0;ctx.strokeStyle='#d1fff1';ctx.lineWidth=Math.max(1,width*.23);ctx.stroke();ctx.fillStyle='#b6ffdf';ctx.beginPath();ctx.arc(tip.x,tip.y,Math.max(2,width*.75),0,Math.PI*2);ctx.fill();ctx.globalAlpha=1}
-const p=project(cell.p),q=project({x:cell.p.x+cell.v.x*25,y:cell.p.y+cell.v.y*25,z:cell.p.z+cell.v.z*25}),theta=Math.atan2(q.y-p.y,q.x-p.x);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(theta);const hunger=clamp(cell.energy/65,0,1),r=(7+cell.size*3)*zoom;ctx.globalAlpha=.3+.7*hunger;ctx.shadowColor='#6de8ca';ctx.shadowBlur=12+cell.size*2;const g=ctx.createRadialGradient(-r*.2,-r*.25,1,0,0,r*1.2);g.addColorStop(0,'#d8fff1');g.addColorStop(.45,'#7de9c8');g.addColorStop(1,'#218e91');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(0,0,r*(1+cell.elongation),r*(1-.18*cell.elongation),0,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='#a4f5dc';ctx.lineWidth=1.2;ctx.stroke();ctx.globalAlpha=.75;ctx.fillStyle='#195c65';ctx.beginPath();ctx.arc(r*.14,0,Math.max(2,r*.23),0,Math.PI*2);ctx.fill();ctx.restore()}
+// One continuous deformable body: its silhouette grows from a circle into an oval,
+// then into a smooth irregular shape spanning every reached or growing target.
+const bodyPoints=[project(cell.p),...branches.map(branch=>project(branch.tip))];
+const radius=(9+cell.size*2.8)*zoom;
+const samples=[];
+for(const p of bodyPoints){for(let i=0;i<20;i++){const t=i*Math.PI/10;samples.push({x:p.x+radius*Math.cos(t),y:p.y+radius*Math.sin(t)})}}
+samples.sort((a,b)=>a.x-b.x||a.y-b.y);
+const cross=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
+const lower=[],upper=[];
+for(const p of samples){while(lower.length>1&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop();lower.push(p)}
+for(let i=samples.length-1;i>=0;i--){const p=samples[i];while(upper.length>1&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop();upper.push(p)}
+lower.pop();upper.pop();const hull=lower.concat(upper);
+if(hull.length>2){
+ const hunger=clamp(cell.energy/65,0,1);
+ const center=hull.reduce((a,p)=>({x:a.x+p.x/hull.length,y:a.y+p.y/hull.length}),{x:0,y:0});
+ const g=ctx.createRadialGradient(center.x-radius*.2,center.y-radius*.25,2,center.x,center.y,Math.max(radius*2,Math.max(...hull.map(p=>Math.hypot(p.x-center.x,p.y-center.y)))));
+ g.addColorStop(0,'#d6fff0');g.addColorStop(.45,'#78e6c6');g.addColorStop(1,'#238b91');
+ ctx.globalAlpha=.32+.68*hunger;ctx.fillStyle=g;ctx.strokeStyle='#b5f9e2';ctx.lineWidth=1.8;ctx.shadowColor='#6de8ca';ctx.shadowBlur=16;
+ ctx.beginPath();
+ for(let i=0;i<hull.length;i++){const p=hull[i],n=hull[(i+1)%hull.length],mid={x:(p.x+n.x)/2,y:(p.y+n.y)/2};if(i===0)ctx.moveTo(mid.x,mid.y);ctx.quadraticCurveTo(n.x,n.y,(n.x+hull[(i+2)%hull.length].x)/2,(n.y+hull[(i+2)%hull.length].y)/2)}
+ ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.stroke();
+ ctx.globalAlpha=.8;const nucleus=project(cell.p);ctx.fillStyle='#23626a';ctx.beginPath();ctx.arc(nucleus.x,nucleus.y,Math.max(2,radius*.22),0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+}
+}
 function chooseRequest(){const n=cell.experience;if(n<1)return ['Энергия?..','Здесь пусто. Можно немного энергии?','Я всё ещё ищу…'][messageIndex++%3];if(n<3)return ['Я помню, где нашла первый источник. Покажи мне ещё один?','Я научилась двигаться к светящейся энергии. Можно попробовать снова?','Мне трудно двигаться без энергии. Поможешь?'][messageIndex++%3];if(n<6)return ['Я стала длиннее и лучше выбираю направление. Дай мне новый источник — хочу проверить свой путь.','Я уже помню '+cell.found+' источника. Мне нужна энергия, чтобы продолжить исследование.','Каждый новый источник меняет мою форму. Мне хочется узнать, какой я стану дальше.'][messageIndex++%3];return ['Я исследовала '+cell.found+' источников и научилась точнее поворачивать. Мне не хватает энергии для следующего открытия.','Я сохранила свои маршруты и опыт. Создай новый источник, и я попробую добраться до него ещё эффективнее.','Я стала сложнее, но мир вокруг по-прежнему огромен. Поможешь мне продолжить путешествие?'][messageIndex++%3]}
 function step(dt){
 cell.age+=dt;cell.energy=Math.max(0,cell.energy-(sources.length?dt*.15:dt*(cell.energy>15?1.6:.7)));cell.starve=clamp((30-cell.energy)/30,0,1);
