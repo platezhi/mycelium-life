@@ -55,18 +55,18 @@ const makeMat=(c,opacity=1)=>new T.MeshPhongMaterial({color:c,emissive:c,emissiv
 function event(s){const p=document.createElement('div');p.textContent='День '+day.toFixed(1)+' · '+s;$('log').prepend(p);while($('log').children.length>9)$('log').lastChild.remove()}
 function traits(i){const v={speed:1,armor:1,sensing:1,efficiency:1,learning:1,attack:1,cooperation:1};v[KEYS[i]]=1.3;return v}
 function addCell(kind,pos,parent){
- const mesh=new T.Mesh(cellGeo,makeMat(COLORS[kind]));mesh.scale.setScalar(3.5);mesh.position.copy(pos||randPos());scene.add(mesh);
+ const geometry=kind%3===0?new T.IcosahedronGeometry(1,1):kind%3===1?new T.SphereGeometry(1,12,9):cellGeo;const mesh=new T.Mesh(geometry,makeMat(COLORS[kind]));mesh.scale.set(kind%3===2?3.9:3.5,kind%3===1?2.8:3.5,kind%3===0?3.9:3.5);mesh.position.copy(pos||randPos());scene.add(mesh);
  const a={id:nextId++,kind,mesh,energy:parent?Math.max(5,parent.energy*.4):11,age:0,life:parent?parent.life:180,traits:parent?{...parent.traits}:traits(kind),fed:new Set(),experience:parent?parent.experience*.3:0,genes:parent?parent.genes:0,adaptation:parent?parent.adaptation:KEYS[kind],arm:parent?parent.arm:false,shell:parent?parent.shell:false,knowledge:parent?[...parent.knowledge]:[],target:null,velocity:new T.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).normalize(),goal:'исследование',asked:false,attackCooldown:0};
  mesh.userData.cell=a;cells.push(a);updateShape(a);return a
 }
 function updateShape(a){
  const m=a.mesh;
- if(a.shell&&!m.userData.shell){const armor=new T.Mesh(new T.IcosahedronGeometry(4.0,1),new T.MeshPhongMaterial({color:COLORS[a.kind],wireframe:true,transparent:true,opacity:.35,depthWrite:false}));m.add(armor);m.userData.shell=armor}
+ if(a.shell&&!m.userData.shell){const armor=new T.Mesh(new T.IcosahedronGeometry(1.18,1),new T.MeshPhongMaterial({color:COLORS[a.kind],wireframe:true,transparent:true,opacity:.35,depthWrite:false}));m.add(armor);m.userData.shell=armor}
  if(!a.shell&&m.userData.shell){m.remove(m.userData.shell);m.userData.shell.geometry.dispose();m.userData.shell.material.dispose();delete m.userData.shell}
- if(a.arm&&!m.userData.arm){const arm=new T.Mesh(new T.CylinderGeometry(.25,.45,4.5,7),makeMat(COLORS[a.kind]));arm.rotation.z=Math.PI/2;arm.position.x=4.1;m.add(arm);m.userData.arm=arm}
+ if(a.arm&&!m.userData.arm){const arm=new T.Mesh(new T.CylinderGeometry(.08,.14,1.45,7),makeMat(COLORS[a.kind]));arm.rotation.z=Math.PI/2;arm.position.x=1.28;m.add(arm);m.userData.arm=arm}
  if(!a.arm&&m.userData.arm){m.remove(m.userData.arm);m.userData.arm.geometry.dispose();m.userData.arm.material.dispose();delete m.userData.arm}
 }
-function removeCell(a){scene.remove(a.mesh);a.mesh.traverse(o=>{if(o.geometry&&o!==a.mesh)o.geometry.dispose();if(o.material)o.material.dispose()});a.mesh.geometry=cellGeo;cells.splice(cells.indexOf(a),1);if(selected===a){selected=null;follow=false}stats[a.kind].dead++;dead++}
+function removeCell(a){scene.remove(a.mesh);a.mesh.traverse(o=>{if(o.geometry&&o!==a.mesh)o.geometry.dispose();if(o.material)o.material.dispose()});cells.splice(cells.indexOf(a),1);if(selected===a){selected=null;follow=false}stats[a.kind].dead++;dead++}
 function spawnEnergy(){
  const pos=randPos(),mesh=new T.Mesh(srcGeo,new T.MeshPhongMaterial({color:0xffd15a,emissive:0xe5a334,emissiveIntensity:.7}));mesh.position.copy(pos);scene.add(mesh);
  const s={id:Date.now()+Math.random(),pos,mesh,units:20};sources.push(s);worldStarted=true;event('Источник энергии появился в случайной точке куба (20 порций)');return s
