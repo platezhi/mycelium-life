@@ -38,22 +38,41 @@ function chooseRequest(){const n=cell.experience;if(n<1)return ['Энергия?
 function step(dt){
  cell.age+=dt;cell.energy=Math.max(0,cell.energy-dt*(sources.length?.25:cell.energy>15?1.5:.7));cell.starve=clamp((30-cell.energy)/30,0,1);
  if(cell.age>=cell.nextWander||dist(cell.p,cell.wander)<9){cell.wander=randPos();cell.nextWander=cell.age+rnd(18,30)}
- const nearest=sources.length?sources.reduce((a,b)=>dist(cell.p,a.p)<dist(cell.p,b.p)?a:b):null;
- const target=nearest?nearest.p:cell.wander;cell.target=target;
- const dx=target.x-cell.p.x,dy=target.y-cell.p.y,dz=target.z-cell.p.z,d=Math.hypot(dx,dy,dz)||1;
- // Gradual deformation of the entire body, never an independently advancing arm.
- const desired=nearest?clamp(d/42,.55,1):.08;
- cell.stretch+=(desired-cell.stretch)*Math.min(1,dt*1.25);
- const speed=(nearest?7.2:1.65)*(1-.55*cell.starve);
- cell.p.x=clamp(cell.p.x+dx/d*speed*dt,-85,85);cell.p.y=clamp(cell.p.y+dy/d*speed*dt,-85,85);cell.p.z=clamp(cell.p.z+dz/d*speed*dt,-85,85);
- if(nearest&&dist(cell.p,nearest.p)<(11.5*Math.sqrt(1+cell.stretch*6.5)+3)){
-  const absorbed=Math.min(nearest.energy,dt*5);nearest.energy-=absorbed;cell.energy=clamp(cell.energy+absorbed,0,100);
-  if(nearest.energy<=.001){sources.splice(sources.indexOf(nearest),1);cell.found++;cell.experience++;cell.memory.push({...nearest.p});cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);requestTime=cell.age+7;say('Я поглотила энергию, немного пополнела и продолжаю медленно исследовать мир.')}
+ // One coherent body, but food can be absorbed at every place its surface touches.
+ const nearby=sources.map(s=>({s,d:dist(cell.p,s.p)})).sort((a,b)=>a.d-b.d);
+ const closest=nearby[0];
+ let target=cell.wander;
+ if(closest){const group=nearby.filter(v=>v.d<=closest.d+36);
+  let wx=0,wy=0,wz=0,total=0;
+  for(const v of group){const weight=1/(14+v.d);wx+=v.s.p.x*weight;wy+=v.s.p.y*weight;wz+=v.s.p.z*weight;total+=weight}
+  target={x:wx/total,y:wy/total,z:wz/total};
  }
+ cell.target=target;
+ const dx=target.x-cell.p.x,dy=target.y-cell.p.y,d=Math.hypot(dx,dy,target.z-cell.p.z)||1;
+ const desired=closest?clamp(closest.d/42,.55,1):.08;
+ cell.stretch+=(desired-cell.stretch)*Math.min(1,dt*1.25);
+ const speed=(closest?7.2:1.65)*(1-.55*cell.starve);
+ cell.p.x=clamp(cell.p.x+dx/d*speed*dt,-85,85);cell.p.y=clamp(cell.p.y+dy/d*speed*dt,-85,85);cell.p.z=clamp(cell.p.z+(target.z-cell.p.z)/d*speed*dt,-85,85);
+ // Match contact to the rendered elongated ellipse, not an arbitrary centre radius.
+ const cp=project(cell.p),sp=project(target),heading=Math.atan2(sp.y-cp.y,sp.x-cp.x);
+ const ca=Math.cos(heading),sa=Math.sin(heading),elong=1+cell.stretch*6.5;
+ const base=clamp(Math.min(w,h)*.00255*zoom*11.5,4.2,12)*Math.sqrt(cell.mass);
+ const major=base*Math.sqrt(elong),minor=base/Math.sqrt(elong);
+ let finished=0;
+ for(const source of [...sources]){
+  const q=project(source.p),ox=q.x-cp.x,oy=q.y-cp.y;
+  const along=(ox*ca+oy*sa)/major,across=(-ox*sa+oy*ca)/minor;
+  const touching=(along*along+across*across)<1.3;
+  const spatial=dist(cell.p,source.p)<19;
+  if(!touching||!spatial)continue;
+  const absorbed=Math.min(source.energy,dt*5);source.energy-=absorbed;cell.energy=clamp(cell.energy+absorbed,0,100);
+  if(source.energy<=.001){sources.splice(sources.indexOf(source),1);cell.found++;cell.experience++;cell.memory.push({...source.p});cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);finished++}
+ }
+ if(finished){requestTime=cell.age+7;say(finished>1?'Я одновременно поглотила несколько источников и немного выросла.':'Я поглотила энергию, немного пополнела и продолжаю исследовать мир.')}
  if(!sources.length&&cell.energy<34&&cell.age>requestTime){say(chooseRequest());requestTime=cell.age+clamp(13-cell.experience*.5,6,13)}
 }
 function updateUI(){$('level').textContent=cell.experience;$('found').textContent=cell.found;$('reserve').textContent=Math.round(cell.energy)+'%';$('bar').style.width=cell.energy+'%';$('size').textContent=cell.size.toFixed(1)+'×';$('age').textContent=Math.floor(cell.age);$('available').textContent=sources.length;const mood=sources.length?'идёт к энергии':cell.energy<12?'сильно ослабла':cell.energy<34?'голодает':'исследует';$('mood').textContent=mood}
-$('energy').onclick=()=>{const s={id:++nextSourceId,p:randPos(),energy:36};sources.push(s);say(sources.length>1?'Я чувствую '+sources.length+' источников. Медленно направляюсь к ближайшему всем телом.':cell.energy<20?'Ты меня услышал! Тянусь к энергии.':'Медленно перемещаюсь к источнику всем телом.');requestTime=cell.age+9;updateUI()};
+$('energy').onclick=()=>{const s={id:++nextSourceId,p:randPos(),energy:36};sources.push(s);say(sources.length>1?'Я чувствую '+sources.length+' источников. Перетекаю к доступным источникам всем телом.':cell.energy<20?'Ты меня услышал! Тянусь к энергии.':'Медленно перемещаюсь к источнику всем телом.');requestTime=cell.age+9;updateUI()};
 $('reset').onclick=init;
 $('talk').addEventListener('submit',e=>{e.preventDefault();const field=$('question'),question=field.value.trim();if(!question)return;field.value='';const q=question.toLowerCase();let answer;
  if(/привет|здравствуй|как тебя зовут|кто ты/.test(q))answer=cell.experience<2?'Привет! Я пока маленькая клетка. Я учусь искать энергию.':'Привет! Я выросла после '+cell.found+' источников. Хочешь узнать, что я запомнила?';
