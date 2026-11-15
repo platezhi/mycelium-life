@@ -56,26 +56,26 @@ function chooseRequest(){const n=cell.experience;if(n<1)return ['Энергия?
 function step(dt){
  cell.age+=dt;cell.energy=Math.max(0,cell.energy-dt*(sources.length?.22:cell.energy>15?1.1:.5));cell.starve=clamp((30-cell.energy)/30,0,1);
  if(cell.age>=cell.nextWander){cell.wander={x:rnd(-65,65),y:rnd(-65,65),z:0};cell.nextWander=cell.age+rnd(15,25)}
- // Two-dimensional nutrient concentration field, diffused independently from all sources.
- chemBuffer.fill(0);
- for(const s of sources){const p=gridPos(s.p);chemBuffer[ix(p.x,p.y)]=Math.min(5,chemBuffer[ix(p.x,p.y)]+4)}
- if(!sources.length){const p=gridPos(cell.wander);chemBuffer[ix(p.x,p.y)]=.3}
+ // All food sources contribute to a shared, smoothly decaying nutrient field.
+ // No single target is selected, so gradients can influence multiple regions at once.
  for(let y=1;y<N-1;y++)for(let x=1;x<N-1;x++){
-  const i=ix(x,y),v=chem[i];
-  chemBuffer[i]+=Math.max(0,v+dt*8*(chem[i-1]+chem[i+1]+chem[i-N]+chem[i+N]-4*v)-dt*.24*v);
+  const i=ix(x,y),wx=x*spacing-85,wy=y*spacing-85;
+  let concentration=0;
+  for(const s of sources){const dx=wx-s.p.x,dy=wy-s.p.y;concentration+=Math.exp(-(dx*dx+dy*dy)/(2*38*38))}
+  if(!sources.length){const dx=wx-cell.wander.x,dy=wy-cell.wander.y;concentration=.24*Math.exp(-(dx*dx+dy*dy)/(2*45*45))}
+  chem[i]=concentration;
  }
- [chem,chemBuffer]=[chemBuffer,chem];
  // Conservative neighbor-to-neighbor material transport: no teleportation or detached arms.
  // Surface tension smooths the perimeter; nutrient gradients bias local flow.
  buffer.set(matter);
- const flow=dt*1.1;
+ const flow=dt*6.0;
  for(let y=2;y<N-2;y++)for(let x=2;x<N-2;x++){
   const i=ix(x,y);
   for(const j of [i+1,i+N]){
    const a=matter[i],b=matter[j];
-   const chemDrive=(chem[j]-chem[i])*.9;
+   const chemDrive=(chem[j]-chem[i])*5;
    const spread=(a-b)*.12;
-   const flux=clamp(flow*(spread+chemDrive*Math.min(a,b+.12)), -b*.16,a*.16);
+   const flux=clamp(flow*(spread+chemDrive*Math.min(a,b+.12)), -b*.23,a*.23);
    buffer[i]-=flux;buffer[j]+=flux;
   }
  }
