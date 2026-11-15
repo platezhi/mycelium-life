@@ -55,8 +55,8 @@ const makeMat=(c,opacity=1)=>new T.MeshPhongMaterial({color:c,emissive:c,emissiv
 function event(s){const p=document.createElement('div');p.textContent='День '+day.toFixed(1)+' · '+s;$('log').prepend(p);while($('log').children.length>9)$('log').lastChild.remove()}
 function traits(i){const v={speed:1,armor:1,sensing:1,efficiency:1,learning:1,attack:1,cooperation:1};v[KEYS[i]]=1.3;return v}
 function addCell(kind,pos,parent){
- const mesh=new T.Mesh(cellGeo,makeMat(COLORS[kind]));mesh.scale.setScalar(3.3);mesh.position.copy(pos||randPos());scene.add(mesh);
- const a={id:nextId++,kind,mesh,energy:parent?parent.energy*.45:7,age:0,life:parent?parent.life:28,traits:parent?{...parent.traits}:traits(kind),fed:new Set(),experience:0,genes:parent?parent.genes:0,arm:parent?parent.arm:false,shell:parent?parent.shell:false,knowledge:parent?[...parent.knowledge]:[],target:null,velocity:new T.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).normalize(),goal:'исследование',asked:false,attackCooldown:0};
+ const mesh=new T.Mesh(cellGeo,makeMat(COLORS[kind]));mesh.scale.setScalar(4.2);mesh.position.copy(pos||randPos());scene.add(mesh);
+ const a={id:nextId++,kind,mesh,energy:parent?parent.energy*.45:11,age:0,life:parent?parent.life:65,traits:parent?{...parent.traits}:traits(kind),fed:new Set(),experience:parent?parent.experience*.3:0,genes:parent?parent.genes:0,arm:parent?parent.arm:false,shell:parent?parent.shell:false,knowledge:parent?[...parent.knowledge]:[],target:null,velocity:new T.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).normalize(),goal:'исследование',asked:false,attackCooldown:0};
  mesh.userData.cell=a;cells.push(a);updateShape(a);return a
 }
 function updateShape(a){
@@ -69,7 +69,7 @@ function updateShape(a){
 function removeCell(a){scene.remove(a.mesh);a.mesh.traverse(o=>{if(o.geometry&&o!==a.mesh)o.geometry.dispose();if(o.material)o.material.dispose()});a.mesh.geometry=cellGeo;cells.splice(cells.indexOf(a),1);if(selected===a){selected=null;follow=false}stats[a.kind].dead++;dead++}
 function spawnEnergy(){
  const pos=randPos(),mesh=new T.Mesh(srcGeo,new T.MeshPhongMaterial({color:0xffd15a,emissive:0xe5a334,emissiveIntensity:.7}));mesh.position.copy(pos);scene.add(mesh);
- const s={id:Date.now()+Math.random(),pos,mesh,units:10};sources.push(s);worldStarted=true;event('Источник энергии появился в случайной точке куба (10 единиц)');return s
+ const s={id:Date.now()+Math.random(),pos,mesh,units:20};sources.push(s);worldStarted=true;event('Источник энергии появился в случайной точке куба (20 порций)');return s
 }
 function addWall(){
  const horizontal=Math.random()<.5,geo=new T.BoxGeometry(horizontal?rnd(35,75):5,rnd(25,60),horizontal?5:rnd(35,75));
@@ -85,53 +85,53 @@ function chooseTarget(a){
  return best
 }
 function evolve(a){
- if(a.energy<4||a.experience<2)return;
+ if(a.energy<2.5||a.experience<1)return;
  const rivals=cells.filter(b=>b.kind!==a.kind&&b.mesh.position.distanceTo(a.mesh.position)<40).length;
  const own=cells.filter(b=>b.kind===a.kind&&b.mesh.position.distanceTo(a.mesh.position)<40).length;
- const choice=rivals>own?'armor':rivals>0?'attack':sources.length?'speed':'sensing';
+ const choice=rivals>own?'armor':rivals>0?'attack':a.genes%3===0?'attack':a.genes%3===1?'armor':sources.length?'speed':'sensing';
  const possible=['speed','armor','sensing','efficiency','learning','attack','cooperation'];
  const key=Math.random()<.35?possible[Math.floor(Math.random()*possible.length)]:choice;
- const cost=2.5/a.traits.efficiency;
+ const cost=1.4/a.traits.efficiency;
  if(a.traits[key]>=5||a.energy<cost)return;
- a.energy-=cost;a.experience-=2;a.traits[key]=Math.min(5,+(a.traits[key]*1.1).toFixed(3));a.genes++;
+ a.energy-=cost;a.experience-=1;a.traits[key]=Math.min(5,+(a.traits[key]*1.1).toFixed(3));a.genes++;
  const concept=knowledge[Math.floor(Math.random()*knowledge.length)];if(!a.knowledge.includes(concept))a.knowledge.push(concept);
- if(key==='armor'&&a.traits.armor>=1.5)a.shell=true;
- if(key==='attack'&&a.traits.attack>=1.5)a.arm=true;
- updateShape(a);if(a===selected||Math.random()<.06)event('Клетка №'+a.id+' улучшила '+key+' на 10%, изучила «'+concept+'»')
+ if(key==='armor'&&a.traits.armor>=1.3)a.shell=true;
+ if(key==='attack'&&a.traits.attack>=1.3)a.arm=true;
+ updateShape(a);if(a===selected||Math.random()<.25)event('Клетка №'+a.id+' улучшила '+key+' на 10%, изучила «'+concept+'»')
 }
 function tick(dt){
  if(!worldStarted)return; // No ageing or starvation before the observer places the first energy source.
  day+=dt;
  for(const a of [...cells]){
   a.age+=dt;a.attackCooldown=Math.max(0,a.attackCooldown-dt);
-  a.energy-=dt*(.14+.025*a.traits.speed+.035*(a.arm?1:0)+.035*(a.shell?1:0))/a.traits.efficiency;
+  a.energy-=dt*(.085+.012*a.traits.speed+.012*(a.arm?1:0)+.012*(a.shell?1:0))/a.traits.efficiency;
   if(a.age>a.life||a.energy<=0){removeCell(a);continue}
-  if(a.experience>=2)evolve(a);
+  if(a.experience>=1)evolve(a);
   let dest=chooseTarget(a);a.target=dest;
   const p=a.mesh.position;
   const enemies=cells.filter(b=>b.kind!==a.kind&&p.distanceTo(b.mesh.position)<35);
   const friends=cells.filter(b=>b.kind===a.kind&&b!==a&&p.distanceTo(b.mesh.position)<40);
-  if(dest){a.goal='поиск энергии';a.velocity.addScaledVector(dest.pos.clone().sub(p).normalize(),dt*7)}
-  else if(enemies.length&&friends.length>=3){a.goal='окружение';a.velocity.addScaledVector(enemies[0].mesh.position.clone().sub(p).normalize(),dt*7)}
+  if(dest){a.goal='поиск энергии';a.velocity.addScaledVector(dest.pos.clone().sub(p).normalize(),dt*14)}
+  else if(enemies.length&&friends.length>=3){a.goal='окружение';a.velocity.addScaledVector(enemies[0].mesh.position.clone().sub(p).normalize(),dt*14)}
   else{a.goal='разведка';a.velocity.add(new T.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).multiplyScalar(dt*.6))}
   if(a.velocity.lengthSq()<.0001)a.velocity.set(1,0,0);a.velocity.normalize();
-  const step=dt*7*a.traits.speed;
+  const step=dt*15*a.traits.speed;
   p.addScaledVector(a.velocity,step);
   for(const axis of ['x','y','z']){if(p[axis]>94){p[axis]=94;a.velocity[axis]*=-1}if(p[axis]<-94){p[axis]=-94;a.velocity[axis]*=-1}}
   for(const w of walls){const box=new T.Box3().setFromObject(w);if(box.distanceToPoint(p)<4){p.addScaledVector(a.velocity,-step*2);a.velocity.multiplyScalar(-1)}}
-  if(dest&&p.distanceTo(dest.pos)<8&&dest.units>0&&!a.fed.has(dest.id)){
-   dest.units--;a.fed.add(dest.id);a.energy=Math.min(12,a.energy+3);a.experience+=1.5*a.traits.learning;a.goal='получена энергия → знания';a.target=null;
+  if(dest&&p.distanceTo(dest.pos)<11&&dest.units>0&&!a.fed.has(dest.id)){
+   dest.units--;a.fed.add(dest.id);a.energy=Math.min(16,a.energy+4.5);a.experience+=2*a.traits.learning;a.goal='получена энергия → знания';a.target=null;
    if(dest.units<=0){scene.remove(dest.mesh);dest.mesh.material.dispose();sources.splice(sources.indexOf(dest),1)}
   }
   if(enemies.length&&friends.length>=3&&a.attackCooldown===0){
    const victim=enemies[0],surround=cells.filter(b=>b.kind===a.kind&&b.mesh.position.distanceTo(victim.mesh.position)<16);
    if(surround.length>=5){victim.kind=a.kind;victim.mesh.material.color.set(COLORS[a.kind]);victim.mesh.material.emissive.set(COLORS[a.kind]);victim.traits={...victim.traits};victim.fed.clear();victim.arm=false;victim.shell=false;updateShape(victim);stats[a.kind].conversions++;a.attackCooldown=1;event('Вид '+(a.kind+1)+' ассимилировал клетку №'+victim.id)}
   }
-  if(a.energy>9&&a.age>2&&cells.length<250&&Math.random()<dt*.08){a.energy*=.55;addCell(a.kind,p.clone().add(new T.Vector3(rnd(-5,5),rnd(-5,5),rnd(-5,5))),a)}
+  if(a.energy>10&&a.age>2&&cells.length<250&&Math.random()<dt*.16){a.energy*=.55;addCell(a.kind,p.clone().add(new T.Vector3(rnd(-5,5),rnd(-5,5),rnd(-5,5))),a)}
  }
  if(day-lastAsk>2&&!pending&&cells.length){const eligible=cells.filter(a=>!a.asked&&a.age<a.life-1).sort((a,b)=>a.id-b.id);const a=eligible.find(a=>a.id>askedId)||eligible[0];if(a){a.asked=true;askedId=a.id;a.life=Math.max(a.age+.2,a.life-1);pending=a;$('speech').textContent='💬 Клетка №'+a.id+': «Дашь мне энергию для знаний?» (−1 год жизни)';$('yes').hidden=$('no').hidden=false}}
 }
-function answer(yes){if(!pending)return;const a=pending;pending=null;if(yes&&cells.includes(a)){a.energy=Math.min(12,a.energy+3);a.experience+=1}lastAsk=day;$('speech').textContent='💬 Клетка №'+a.id+': '+(yes?'«Спасибо, я смогу развиваться!»':'«Поняла, буду искать сама».');$('yes').hidden=$('no').hidden=true}
+function answer(yes){if(!pending)return;const a=pending;pending=null;if(yes&&cells.includes(a)){a.energy=Math.min(16,a.energy+4);a.experience+=1.5}lastAsk=day;$('speech').textContent='💬 Клетка №'+a.id+': '+(yes?'«Спасибо, я смогу развиваться!»':'«Поняла, буду искать сама».');$('yes').hidden=$('no').hidden=true}
 $('yes').onclick=()=>answer(true);$('no').onclick=()=>answer(false);
 $('add').onclick=()=>{for(let i=0;i<10&&cells.length<250;i++)addCell(i);event('Добавлены 10 клеток существующих видов')};
 $('energy').onclick=spawnEnergy;
