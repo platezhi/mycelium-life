@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id),canvas=$('world'),ctx=canvas.getContext(
 let cell,sources=[],branches=[],nodes=[],nextSourceId=0,angle=.7,pitch=.38,zoom=1,drag=null,pointers=new Map(),lastPinch=0,last=performance.now(),uiTimer=0,requestTime=0,prevMood='',lastMessage='',messageIndex=0;
 const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z),randPos=()=>({x:rnd(-75,75),y:rnd(-75,75),z:rnd(-75,75)});
 function say(t){if(t!==lastMessage){$('words').textContent=t;lastMessage=t}}
-function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10)};sources=[];branches=[];nodes=[{x:0,y:0,z:0}];nextSourceId=0;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
+function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,mass:1,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10)};sources=[];branches=[];nodes=[{x:0,y:0,z:0}];nextSourceId=0;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
 function project(p){const x=p.x*Math.cos(angle)-p.z*Math.sin(angle),z=p.x*Math.sin(angle)+p.z*Math.cos(angle),y=p.y*Math.cos(pitch)-z*Math.sin(pitch);const scale=Math.min(w,h)*.00255*zoom;return{x:w/2+x*scale,y:h/2-y*scale,scale}}
 function line(a,b,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
 function draw(){ctx.clearRect(0,0,w,h);const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});const pp=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++){const d=dist(corners[i],corners[j]);if(Math.abs(d-200)<.01)line(pp[i],pp[j],'rgba(130,207,226,.48)',1)}
@@ -20,17 +20,24 @@ const root=project(cell.p);
 const density=Math.min(1,220/Math.max(w,h)),sw=Math.max(1,Math.ceil(w*density)),sh=Math.max(1,Math.ceil(h*density));
 if(!draw.skin||draw.skin.width!==sw||draw.skin.height!==sh){draw.skin=document.createElement('canvas');draw.skin.width=sw;draw.skin.height=sh;draw.skinCtx=draw.skin.getContext('2d')}
 const image=draw.skinCtx.createImageData(sw,sh),pixels=image.data;
-const r=radius*density,softness=Math.max(4,r*.85),fade=clamp(cell.energy/65,0,1);
+// Approximate conservation of projected body area: extending branches draw material from the core.
+const totalLength=branches.reduce((sum,b)=>sum+dist(b.origin,b.tip),0);
+const bodyScale=Math.sqrt(cell.mass);
+const r=radius*density*bodyScale;
+const lengthPixels=totalLength*Math.min(w,h)*.00255*zoom*density;
+const stemRadius=clamp(r*r*.32/(lengthPixels+1),r*.12,r*.43);
+const coreRadius=Math.sqrt(Math.max(r*r*.34,r*r-lengthPixels*stemRadius*.62));
+const softness=Math.max(1.2,stemRadius*.85),fade=clamp(cell.energy/65,0,1);
 const pieces=segments.map(s=>({ax:s.a.x*density,ay:s.a.y*density,bx:s.b.x*density,by:s.b.y*density,id:s.id}));
 const rootX=root.x*density,rootY=root.y*density;
 function merge(a,b,k){const t=Math.max(k-Math.abs(a-b),0)/k;return Math.min(a,b)-t*t*k*.25}
 function field(x,y){
- let d=Math.hypot(x-rootX,y-rootY)-r*1.1;
+ let d=Math.hypot(x-rootX,y-rootY)-coreRadius;
  for(const s of pieces){
   const vx=s.bx-s.ax,vy=s.by-s.ay,len2=vx*vx+vy*vy;
   const t=len2?clamp(((x-s.ax)*vx+(y-s.ay)*vy)/len2,0,1):0;
   const px=s.ax+t*vx,py=s.ay+t*vy;
-  const thickness=r*(.94+.16*Math.sin(t*6.28+s.id*.7+cell.age*.4));
+  const thickness=stemRadius*(.88+.12*Math.sin(t*6.28+s.id*.7+cell.age*.4));
   const v=Math.hypot(x-px,y-py)-thickness;
   d=merge(d,v,softness);
  }
@@ -59,18 +66,17 @@ function step(dt){
 cell.age+=dt;cell.energy=Math.max(0,cell.energy-(sources.length?dt*.15:dt*(cell.energy>15?1.6:.7)));cell.starve=clamp((30-cell.energy)/30,0,1);
 // The first body is fixed as the root. Growth is permanent; only growing tips move.
 for(const branch of branches){
- if(branch.complete)continue;
  const s=sources.find(v=>v.id===branch.id);
- if(!s)continue;
+ if(!s){const d=dist(branch.tip,branch.origin);if(d<.5){branches.splice(branches.indexOf(branch),1);continue}const pull=Math.min(d,dt*15);branch.tip.x+=(branch.origin.x-branch.tip.x)/d*pull;branch.tip.y+=(branch.origin.y-branch.tip.y)/d*pull;branch.tip.z+=(branch.origin.z-branch.tip.z)/d*pull;continue}
  const d=dist(branch.tip,s.p),rate=19*(1+Math.min(.7,cell.experience*.06));
  if(d>0){const step=Math.min(d,rate*dt);branch.tip.x+=(s.p.x-branch.tip.x)/d*step;branch.tip.y+=(s.p.y-branch.tip.y)/d*step;branch.tip.z+=(s.p.z-branch.tip.z)/d*step}
  if(dist(branch.tip,s.p)<2){const absorbed=Math.min(s.energy,dt*11);s.energy-=absorbed;cell.energy=clamp(cell.energy+absorbed*1.1,0,100);
- if(s.energy<=.001){sources.splice(sources.indexOf(s),1);branch.complete=true;nodes.push({...branch.tip});cell.found++;cell.experience++;cell.memory.push({...s.p});cell.size=Math.min(4,cell.size+.16);cell.elongation=Math.min(.7,cell.elongation+.06);requestTime=cell.age+7;say('Я закрепилась на новом месте. Источник иссяк, но выросшая часть моего тела осталась. '+(sources.length?'Продолжаю тянуться к остальным.':'Жду новых источников.'))}}
+ if(s.energy<=.001){sources.splice(sources.indexOf(s),1);branch.complete=false;cell.found++;cell.experience++;cell.memory.push({...s.p});cell.mass=Math.min(1.7,cell.mass+.035);cell.size=Math.sqrt(cell.mass);cell.elongation=Math.min(.7,cell.elongation+.02);requestTime=cell.age+7;say('Источник иссяк. Я немного пополнела и теперь втягиваю вытянутую часть тела. '+(sources.length?'Продолжаю тянуться к остальным.':'Жду новых источников.'))}}
 }
 if(!sources.length&&cell.energy<34&&cell.age>requestTime){say(chooseRequest());requestTime=cell.age+clamp(13-cell.experience*.5,6,13)}
 }
 function updateUI(){$('level').textContent=cell.experience;$('found').textContent=cell.found;$('reserve').textContent=Math.round(cell.energy)+'%';$('bar').style.width=cell.energy+'%';$('size').textContent=cell.size.toFixed(1)+'×';$('age').textContent=Math.floor(cell.age);$('available').textContent=sources.length;const mood=sources.length?'идёт к энергии':cell.energy<12?'сильно ослабла':cell.energy<34?'голодает':'исследует';$('mood').textContent=mood}
-$('energy').onclick=()=>{const s={id:++nextSourceId,p:randPos(),energy:36};sources.push(s);const candidates=[...nodes,...branches.map(b=>b.tip)];const origin=candidates.reduce((a,b)=>dist(a,s.p)<dist(b,s.p)?a:b);branches.push({id:s.id,origin:{...origin},tip:{...origin},complete:false});say(sources.length>1?'Я чувствую '+sources.length+' источников. Расту от закреплённых участков к каждому одновременно!':cell.energy<20?'Ты меня услышал! Тянусь к энергии.':'Расту к источнику и закреплюсь на нём.');requestTime=cell.age+9;updateUI()};
+$('energy').onclick=()=>{const s={id:++nextSourceId,p:randPos(),energy:36};sources.push(s);const origin=cell.p;branches.push({id:s.id,origin:{...origin},tip:{...origin},complete:false});say(sources.length>1?'Я чувствую '+sources.length+' источников. Перераспределяю свою массу и тянусь ко всем одновременно!':cell.energy<20?'Ты меня услышал! Тянусь к энергии.':'Вытягиваюсь к источнику, забирая часть массы из центра.');requestTime=cell.age+9;updateUI()};
 $('reset').onclick=init;
 $('talk').addEventListener('submit',e=>{e.preventDefault();const field=$('question'),question=field.value.trim();if(!question)return;field.value='';const q=question.toLowerCase();let answer;
  if(/привет|здравствуй|как тебя зовут|кто ты/.test(q))answer=cell.experience<2?'Привет! Я пока маленькая клетка. Я учусь искать энергию.':'Привет! Я выросла после '+cell.found+' источников. Хочешь узнать, что я запомнила?';
