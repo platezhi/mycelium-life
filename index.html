@@ -24,27 +24,28 @@ function init(){
 }
 
 function project(p){const x=p.x*Math.cos(angle)-p.z*Math.sin(angle),z=p.x*Math.sin(angle)+p.z*Math.cos(angle),y=p.y*Math.cos(pitch)-z*Math.sin(pitch);const scale=Math.min(w,h)*.00255*zoom;return{x:w/2+x*scale,y:h/2-y*scale,scale}}
+function organismProject(p){const scale=Math.min(w,h)*.00255*zoom;return{x:w/2+p.x*scale,y:h/2-p.y*scale,scale}}
 function line(a,b,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
 function draw(){
  ctx.clearRect(0,0,w,h);
  const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});
  const pp=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++)if(Math.abs(dist(corners[i],corners[j])-200)<.01)line(pp[i],pp[j],'rgba(130,207,226,.48)',1);
- for(const source of sources){const s=project(source.p),r=4+Math.sqrt(source.energy)*.65;
+ for(const source of sources){const s=organismProject(source.p),r=4+Math.sqrt(source.energy)*.65;
   ctx.shadowColor='#ffe477';ctx.shadowBlur=16;ctx.strokeStyle='#ffdf72';ctx.lineWidth=2;
   ctx.beginPath();ctx.arc(s.x,s.y,r,0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0;
  }
  // Draw the continuous material density on the rotated world plane, not radial lobes or limbs.
  // Smooth contours emerge from local transport and surface tension.
- const threshold=.16;
+ const threshold=.09;
  ctx.save();ctx.globalAlpha=.93;
  for(let y=1;y<N-2;y++)for(let x=1;x<N-2;x++){
   const i=ix(x,y),v=matter[i];if(v<threshold)continue;
-  const p=project({x:x*spacing-85,y:y*spacing-85,z:0});
-  const px=project({x:(x+1)*spacing-85,y:y*spacing-85,z:0});
-  const py=project({x:x*spacing-85,y:(y+1)*spacing-85,z:0});
+  const p=organismProject({x:x*spacing-85,y:y*spacing-85,z:0});
+  const px=organismProject({x:(x+1)*spacing-85,y:y*spacing-85,z:0});
+  const py=organismProject({x:x*spacing-85,y:(y+1)*spacing-85,z:0});
   const gx=matter[i+1]-matter[i-1],gy=matter[i+N]-matter[i-N];
   const light=clamp(.76-gx*.7+gy*.8,0,1);
-  const opacity=clamp((v-threshold)*4.2,0,1);
+  const opacity=clamp((v-threshold)*5.4,0,1);
   ctx.fillStyle='rgba('+Math.round(125+100*light)+','+Math.round(175+73*light)+','+Math.round(184+68*light)+','+opacity+')';
   ctx.beginPath();ctx.moveTo(p.x,p.y);
   ctx.lineTo(px.x,px.y);ctx.lineTo(px.x+py.x-p.x,px.y+py.y-p.y);ctx.lineTo(py.x,py.y);ctx.closePath();ctx.fill();
@@ -68,14 +69,14 @@ function step(dt){
  // Local flux: grow from the existing perimeter, never create new remote blobs.
  // Retained footprint represents already colonized tissue and slows its retraction.
  buffer.set(matter);
- const flow=dt*2.8;
+ const flow=dt*10;
  for(let y=2;y<N-2;y++)for(let x=2;x<N-2;x++){
   const i=ix(x,y);
   for(const j of [i+1,i+N]){
    const a=matter[i],b=matter[j];
-   const gradient=(chem[j]-chem[i])*3.2;
-   const diff=(a-b)*.09;
-   const flux=clamp(flow*(diff+gradient*Math.min(a,b+.055)),-b*.095,a*.095);
+   const gradient=(chem[j]-chem[i])*9;
+   const diff=(a-b)*.035;
+   const flux=clamp(flow*(diff+gradient*Math.min(a,b+.12)),-b*.18,a*.18);
    buffer[i]-=flux;buffer[j]+=flux;
   }
  }
@@ -103,12 +104,12 @@ function step(dt){
  let eaten=0;
  for(const s of [...sources]){
   const p=gridPos(s.p),v=matter[ix(p.x,p.y)];
-  if(v<.27)continue;
+  if(v<.11)continue;
   const amount=Math.min(s.energy,dt*5);s.energy-=amount;cell.energy=clamp(cell.energy+amount,0,100);
   if(s.energy<=.001){
    sources.splice(sources.indexOf(s),1);cell.found++;cell.experience++;cell.memory.push({...s.p});
    cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);
-   const extra=totalMatter*.07;totalMatter+=extra;for(let oy=-2;oy<=2;oy++)for(let ox=-2;ox<=2;ox++){const k=ix(p.x+ox,p.y+oy);matter[k]+=extra/25;footprint[k]=Math.max(footprint[k],.11)}
+   const extra=totalMatter*.09;totalMatter+=extra;for(let oy=-2;oy<=2;oy++)for(let ox=-2;ox<=2;ox++){const k=ix(p.x+ox,p.y+oy);matter[k]+=extra/25;footprint[k]=Math.max(footprint[k],.11)}
    eaten++;
   }
  }
