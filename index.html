@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id),canvas=$('world'),ctx=canvas.getContext(
 let cell,sources=[],branches=[],nodes=[],particles=[],nextSourceId=0,angle=.7,pitch=.38,zoom=1,drag=null,pointers=new Map(),lastPinch=0,last=performance.now(),uiTimer=0,requestTime=0,prevMood='',lastMessage='',messageIndex=0;
 const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z),randPos=()=>({x:rnd(-75,75),y:rnd(-75,75),z:rnd(-75,75)});
 function say(t){if(t!==lastMessage){$('words').textContent=t;lastMessage=t}}
-function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,mass:1,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10),wander:{x:rnd(-65,65),y:rnd(-65,65),z:rnd(-65,65)},nextWander:0,foodTargetId:null};sources=[];branches=[];nodes=[];particles=Array.from({length:46},(_,i)=>{const t=i*2.399963,rad=Math.sqrt((i+.5)/46)*5.5;return{x:Math.cos(t)*rad,y:Math.sin(t)*rad,z:Math.sin(t*1.7)*rad*.5,vx:0,vy:0,vz:0}});nextSourceId=0;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
+function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,mass:1,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10),wander:{x:rnd(-65,65),y:rnd(-65,65),z:rnd(-65,65)},nextWander:0,foodTargetId:null,stretch:0,heading3:{x:1,y:0,z:0}};sources=[];branches=[];nodes=[];particles=Array.from({length:46},(_,i)=>{const t=i*2.399963,rad=Math.sqrt((i+.5)/46)*5.5;return{x:Math.cos(t)*rad,y:Math.sin(t)*rad,z:Math.sin(t*1.7)*rad*.5,vx:0,vy:0,vz:0}});nextSourceId=0;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
 function project(p){const x=p.x*Math.cos(angle)-p.z*Math.sin(angle),z=p.x*Math.sin(angle)+p.z*Math.cos(angle),y=p.y*Math.cos(pitch)-z*Math.sin(pitch);const scale=Math.min(w,h)*.00255*zoom;return{x:w/2+x*scale,y:h/2-y*scale,scale}}
 function line(a,b,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
 function draw(){ctx.clearRect(0,0,w,h);const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});const pp=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++){const d=dist(corners[i],corners[j]);if(Math.abs(d-200)<.01)line(pp[i],pp[j],'rgba(130,207,226,.48)',1)}
@@ -17,7 +17,16 @@ for(const source of sources){const s=project(source.p),r=4+Math.sqrt(source.ener
 const density=Math.min(1,230/Math.max(w,h)),sw=Math.ceil(w*density),sh=Math.ceil(h*density);
 if(!draw.skin||draw.skin.width!==sw||draw.skin.height!==sh){draw.skin=document.createElement('canvas');draw.skin.width=sw;draw.skin.height=sh;draw.skinCtx=draw.skin.getContext('2d')}
 const img=draw.skinCtx.createImageData(sw,sh),pix=img.data;
-const points=particles.map(p=>{const q=project(p);return{x:q.x*density,y:q.y*density}});
+// Deform the whole material distribution along the food direction, not by growing arms.
+const axis=cell.heading3,stretch=1+cell.stretch*2.6,side=1/Math.sqrt(stretch);
+const points=particles.map(p=>{
+ const dx=p.x-cell.p.x,dy=p.y-cell.p.y,dz=p.z-cell.p.z;
+ const along=dx*axis.x+dy*axis.y+dz*axis.z;
+ const q=project({x:cell.p.x+(dx-axis.x*along)*side+axis.x*along*stretch,
+ y:cell.p.y+(dy-axis.y*along)*side+axis.y*along*stretch,
+ z:cell.p.z+(dz-axis.z*along)*side+axis.z*along*stretch});
+ return{x:q.x*density,y:q.y*density}
+});
 const scale=Math.min(w,h)*.00255*zoom*density;
 const sigma=clamp(scale*10,3.5,8),inv=1/(2*sigma*sigma),limit=sigma*3;
 const values=new Float32Array(sw*sh);
@@ -44,7 +53,15 @@ function step(dt){
  cell.foodTargetId=chosen?chosen.id:null;
  const target=chosen?chosen.p:cell.wander;
  const dx=target.x-cell.p.x,dy=target.y-cell.p.y,dz=target.z-cell.p.z,d=Math.hypot(dx,dy,dz)||1;
- const speed=(chosen?3.4:1.55)*(1-.45*cell.starve);
+ // Persistent food target prevents oscillation; visible full-body stretching is independent of translation.
+const desired=chosen?Math.min(1,dist(cell.p,chosen.p)/35):.08;
+cell.stretch+=(desired-cell.stretch)*Math.min(1,dt*.55);
+cell.heading3.x+=(dx/d-cell.heading3.x)*Math.min(1,dt*.9);
+cell.heading3.y+=(dy/d-cell.heading3.y)*Math.min(1,dt*.9);
+cell.heading3.z+=(dz/d-cell.heading3.z)*Math.min(1,dt*.9);
+const hm=Math.hypot(cell.heading3.x,cell.heading3.y,cell.heading3.z)||1;
+cell.heading3.x/=hm;cell.heading3.y/=hm;cell.heading3.z/=hm;
+const speed=(chosen?5.4:1.8)*(1-.45*cell.starve);
  const travel={x:dx/d*speed*dt,y:dy/d*speed*dt,z:dz/d*speed*dt};
  cell.p.x=clamp(cell.p.x+travel.x,-83,83);cell.p.y=clamp(cell.p.y+travel.y,-83,83);cell.p.z=clamp(cell.p.z+travel.z,-83,83);
  // All parcels travel together, with low-frequency internal flow and local cohesion.
