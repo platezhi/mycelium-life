@@ -37,38 +37,43 @@ draw.skinCtx.putImageData(img,0,0);ctx.save();ctx.imageSmoothingEnabled=true;ctx
 function chooseRequest(){const n=cell.experience;if(n<1)return ['Энергия?..','Здесь пусто. Можно немного энергии?','Я всё ещё ищу…'][messageIndex++%3];if(n<3)return ['Я помню, где нашла первый источник. Покажи мне ещё один?','Я научилась двигаться к светящейся энергии. Можно попробовать снова?','Мне трудно двигаться без энергии. Поможешь?'][messageIndex++%3];if(n<6)return ['Я стала длиннее и лучше выбираю направление. Дай мне новый источник — хочу проверить свой путь.','Я уже помню '+cell.found+' источника. Мне нужна энергия, чтобы продолжить исследование.','Каждый новый источник меняет мою форму. Мне хочется узнать, какой я стану дальше.'][messageIndex++%3];return ['Я исследовала '+cell.found+' источников и научилась точнее поворачивать. Мне не хватает энергии для следующего открытия.','Я сохранила свои маршруты и опыт. Создай новый источник, и я попробую добраться до него ещё эффективнее.','Я стала сложнее, но мир вокруг по-прежнему огромен. Поможешь мне продолжить путешествие?'][messageIndex++%3]}
 function step(dt){
  cell.age+=dt;cell.energy=Math.max(0,cell.energy-dt*(sources.length?.25:cell.energy>15?1.5:.7));cell.starve=clamp((30-cell.energy)/30,0,1);
- // The entire cell is made of mobile material parcels; attraction redistributes them.
- if(cell.age>=cell.nextWander||dist(cell.p,cell.wander)<12){cell.wander=randPos();cell.nextWander=cell.age+rnd(6,12)}
+ if(cell.age>=cell.nextWander||dist(cell.p,cell.wander)<9){cell.wander=randPos();cell.nextWander=cell.age+rnd(18,30)}
+ // One destination for the WHOLE organism, never individual parcel-to-food tentacles.
  const target=sources.length?sources.reduce((a,b)=>dist(cell.p,a.p)<dist(cell.p,b.p)?a:b).p:cell.wander;
  const dx=target.x-cell.p.x,dy=target.y-cell.p.y,dz=target.z-cell.p.z,d=Math.hypot(dx,dy,dz)||1;
- const speed=(sources.length?5:3.2)*(1-.55*cell.starve);
- cell.p.x=clamp(cell.p.x+dx/d*speed*dt,-82,82);cell.p.y=clamp(cell.p.y+dy/d*speed*dt,-82,82);cell.p.z=clamp(cell.p.z+dz/d*speed*dt,-82,82);
- // A finite set of parcels share mass; no new geometry is created when reaching food.
- const targets=sources.map(s=>s.p),count=particles.length;
+ const speed=(sources.length?1.65:1.1)*(1-.55*cell.starve);
+ const travel={x:dx/d*speed*dt,y:dy/d*speed*dt,z:dz/d*speed*dt};
+ cell.p.x=clamp(cell.p.x+travel.x,-83,83);cell.p.y=clamp(cell.p.y+travel.y,-83,83);cell.p.z=clamp(cell.p.z+travel.z,-83,83);
+ // All parcels travel together, with low-frequency internal flow and local cohesion.
+ // No parcel is assigned to a source and none can shoot ahead of the body.
+ const count=particles.length,forces=particles.map(()=>({x:0,y:0,z:0}));
  for(let i=0;i<count;i++){
-  const p=particles[i],phase=i*2.399963;
-  const assigned=targets.length?targets[i%targets.length]:null;
-  const aim=assigned||cell.p;
-  // Stretch by reallocating only a fraction of the parcels; the rest keep the body cohesive.
-  const explore=assigned?(i%5===0?.8:.28):.16;
-  const tx=cell.p.x+(aim.x-cell.p.x)*explore+Math.cos(phase+cell.age*.55)*7;
-  const ty=cell.p.y+(aim.y-cell.p.y)*explore+Math.sin(phase*1.3+cell.age*.44)*7;
-  const tz=cell.p.z+(aim.z-cell.p.z)*explore+Math.sin(phase+cell.age*.39)*5;
-  const ax=(tx-p.x)*.55,ay=(ty-p.y)*.55,az=(tz-p.z)*.55;
-  p.vx=(p.vx+ax*dt)*Math.exp(-2.8*dt);p.vy=(p.vy+ay*dt)*Math.exp(-2.8*dt);p.vz=(p.vz+az*dt)*Math.exp(-2.8*dt);
-  p.x=clamp(p.x+p.vx*dt,-95,95);p.y=clamp(p.y+p.vy*dt,-95,95);p.z=clamp(p.z+p.vz*dt,-95,95);
+  const p=particles[i];p.x+=travel.x;p.y+=travel.y;p.z+=travel.z;
+  for(let j=i+1;j<count;j++){
+   const q=particles[j],x=q.x-p.x,y=q.y-p.y,z=q.z-p.z,r=Math.hypot(x,y,z)||.001;
+   if(r<19){const push=(r-11)*.035;forces[i].x+=x/r*push;forces[i].y+=y/r*push;forces[i].z+=z/r*push;forces[j].x-=x/r*push;forces[j].y-=y/r*push;forces[j].z-=z/r*push}
+  }
  }
- // Food is absorbed by the living material, not by an imaginary extending rod.
+ for(let i=0;i<count;i++){
+  const p=particles[i],phase=i*2.399963,fx=forces[i].x,fy=forces[i].y,fz=forces[i].z;
+  // Weak attraction to the organism's moving centre prevents detached limbs.
+  const ax=fx+(cell.p.x-p.x)*.018+Math.sin(cell.age*.42+phase)*.09;
+  const ay=fy+(cell.p.y-p.y)*.018+Math.cos(cell.age*.35+phase*1.3)*.09;
+  const az=fz+(cell.p.z-p.z)*.018+Math.sin(cell.age*.29+phase*.7)*.06;
+  p.vx=(p.vx+ax*dt)*Math.exp(-2.2*dt);p.vy=(p.vy+ay*dt)*Math.exp(-2.2*dt);p.vz=(p.vz+az*dt)*Math.exp(-2.2*dt);
+  p.x=clamp(p.x+p.vx*dt,-94,94);p.y=clamp(p.y+p.vy*dt,-94,94);p.z=clamp(p.z+p.vz*dt,-94,94);
+ }
+ // Only physical proximity of the cohesive organism permits absorption.
  for(const source of [...sources]){
-  let near=0;for(const p of particles)if(dist(p,source.p)<17)near++;
-  if(near){const consumed=Math.min(source.energy,dt*10*Math.min(1,near/5));source.energy-=consumed;cell.energy=clamp(cell.energy+consumed,0,100);
-   if(source.energy<=.001){sources.splice(sources.indexOf(source),1);cell.found++;cell.experience++;cell.memory.push({...source.p});cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);requestTime=cell.age+7;say('Я поглотила энергию, немного пополнела и продолжаю исследовать мир.')}
+  let near=0;for(const p of particles)if(dist(p,source.p)<18)near++;
+  if(near>=3){const consumed=Math.min(source.energy,dt*5*Math.min(1,near/10));source.energy-=consumed;cell.energy=clamp(cell.energy+consumed,0,100);
+   if(source.energy<=.001){sources.splice(sources.indexOf(source),1);cell.found++;cell.experience++;cell.memory.push({...source.p});cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);requestTime=cell.age+7;say('Я поглотила энергию, немного пополнела и продолжаю медленно исследовать мир.')}
   }
  }
  if(!sources.length&&cell.energy<34&&cell.age>requestTime){say(chooseRequest());requestTime=cell.age+clamp(13-cell.experience*.5,6,13)}
 }
 function updateUI(){$('level').textContent=cell.experience;$('found').textContent=cell.found;$('reserve').textContent=Math.round(cell.energy)+'%';$('bar').style.width=cell.energy+'%';$('size').textContent=cell.size.toFixed(1)+'×';$('age').textContent=Math.floor(cell.age);$('available').textContent=sources.length;const mood=sources.length?'идёт к энергии':cell.energy<12?'сильно ослабла':cell.energy<34?'голодает':'исследует';$('mood').textContent=mood}
-$('energy').onclick=()=>{const s={id:++nextSourceId,p:randPos(),energy:36};sources.push(s);say(sources.length>1?'Я чувствую '+sources.length+' источников. Перераспределяю свою массу и тянусь ко всем одновременно!':cell.energy<20?'Ты меня услышал! Тянусь к энергии.':'Перетекаю к источнику, перераспределяя свою массу.');requestTime=cell.age+9;updateUI()};
+$('energy').onclick=()=>{const s={id:++nextSourceId,p:randPos(),energy:36};sources.push(s);say(sources.length>1?'Я чувствую '+sources.length+' источников. Медленно направляюсь к ближайшему всем телом.':cell.energy<20?'Ты меня услышал! Тянусь к энергии.':'Медленно перемещаюсь к источнику всем телом.');requestTime=cell.age+9;updateUI()};
 $('reset').onclick=init;
 $('talk').addEventListener('submit',e=>{e.preventDefault();const field=$('question'),question=field.value.trim();if(!question)return;field.value='';const q=question.toLowerCase();let answer;
  if(/привет|здравствуй|как тебя зовут|кто ты/.test(q))answer=cell.experience<2?'Привет! Я пока маленькая клетка. Я учусь искать энергию.':'Привет! Я выросла после '+cell.found+' источников. Хочешь узнать, что я запомнила?';
