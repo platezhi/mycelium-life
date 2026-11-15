@@ -7,29 +7,38 @@ const $=id=>document.getElementById(id),canvas=$('world'),ctx=canvas.getContext(
 let cell,sources=[],branches=[],nodes=[],particles=[],nextSourceId=0,angle=.7,pitch=.38,zoom=1,drag=null,pointers=new Map(),lastPinch=0,last=performance.now(),uiTimer=0,requestTime=0,prevMood='',lastMessage='',messageIndex=0;
 const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z),randPos=()=>({x:rnd(-75,75),y:rnd(-75,75),z:rnd(-75,75)});
 function say(t){if(t!==lastMessage){$('words').textContent=t;lastMessage=t}}
-function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,mass:1,stretch:0,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10),wander:{x:rnd(-65,65),y:rnd(-65,65),z:rnd(-65,65)},nextWander:0};sources=[];branches=[];nodes=[];particles=Array.from({length:46},(_,i)=>{const t=i*2.399963,rad=Math.sqrt((i+.5)/46)*5.8;return{x:Math.cos(t)*rad,y:Math.sin(t)*rad,z:Math.sin(t*1.7)*rad*.5,vx:0,vy:0,vz:0}});nextSourceId=0;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
+function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,mass:1,lobes:[],stretch:0,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10),wander:{x:rnd(-65,65),y:rnd(-65,65),z:rnd(-65,65)},nextWander:0};sources=[];branches=[];nodes=[];particles=Array.from({length:46},(_,i)=>{const t=i*2.399963,rad=Math.sqrt((i+.5)/46)*5.8;return{x:Math.cos(t)*rad,y:Math.sin(t)*rad,z:Math.sin(t*1.7)*rad*.5,vx:0,vy:0,vz:0}});nextSourceId=0;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
 function project(p){const x=p.x*Math.cos(angle)-p.z*Math.sin(angle),z=p.x*Math.sin(angle)+p.z*Math.cos(angle),y=p.y*Math.cos(pitch)-z*Math.sin(pitch);const scale=Math.min(w,h)*.00255*zoom;return{x:w/2+x*scale,y:h/2-y*scale,scale}}
 function line(a,b,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
 function draw(){ctx.clearRect(0,0,w,h);const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});const pp=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++){const d=dist(corners[i],corners[j]);if(Math.abs(d-200)<.01)line(pp[i],pp[j],'rgba(130,207,226,.48)',1)}
 for(const source of sources){const s=project(source.p),r=4+Math.sqrt(source.energy)*.65+Math.sin(cell.age*5)*1.2;ctx.shadowColor='#ffe477';ctx.shadowBlur=18;ctx.strokeStyle='#ffdf72';ctx.lineWidth=2;ctx.beginPath();ctx.arc(s.x,s.y,r,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#fff0a5';ctx.beginPath();ctx.arc(s.x,s.y,Math.max(1.5,source.energy/15),0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
-// A single compact deformable organism, not an overlapping particle cloud.
-// Whole-body elongation conserves area: longer axis means a narrower cross-axis.
-const density=Math.min(1,260/Math.max(w,h)),sw=Math.ceil(w*density),sh=Math.ceil(h*density);
+// A connected multi-directional soft surface: angular lobes share one boundary.
+// No ellipse, fixed nucleus, rods, or independent arms.
+const density=Math.min(1,280/Math.max(w,h)),sw=Math.ceil(w*density),sh=Math.ceil(h*density);
 if(!draw.skin||draw.skin.width!==sw||draw.skin.height!==sh){draw.skin=document.createElement('canvas');draw.skin.width=sw;draw.skin.height=sh;draw.skinCtx=draw.skin.getContext('2d')}
 const img=draw.skinCtx.createImageData(sw,sh),pix=img.data;
-const cp=project(cell.p),centerX=cp.x*density,centerY=cp.y*density;
-const target=cell.target||cell.wander,sp=project(target);
-const heading=Math.atan2((sp.y-cp.y),(sp.x-cp.x));
-const elong=1+cell.stretch*6.5,base=clamp(Math.min(w,h)*.00255*zoom*density*11.5,4.2,12)*Math.sqrt(cell.mass);
-const major=base*Math.sqrt(elong),minor=base/Math.sqrt(elong),ca=Math.cos(heading),sa=Math.sin(heading);
+const cp=project(cell.p),cx=cp.x*density,cy=cp.y*density;
+const base=clamp(Math.min(w,h)*.00255*zoom*density*11.5,3.4,11)*Math.sqrt(cell.mass);
+const lobes=cell.lobes||[];
+const n=96,radii=new Float32Array(n),directions=lobes.map(l=>{const q=project(l.p);return{angle:Math.atan2(q.y-cp.y,q.x-cp.x),strength:l.strength}});
+let meanSquare=0;
+for(let i=0;i<n;i++){
+ const theta=i*2*Math.PI/n;
+ let growth=0;
+ for(const l of directions){const delta=Math.atan2(Math.sin(theta-l.angle),Math.cos(theta-l.angle));growth+=l.strength*Math.exp(-delta*delta/(2*.48*.48))}
+ const ripple=.055*Math.sin(theta*4+cell.age*.6)+.035*Math.sin(theta*7-cell.age*.38)+.022*Math.sin(theta*11+cell.age*.29);
+ radii[i]=Math.max(.57,1+growth+ripple);meanSquare+=radii[i]*radii[i]/n;
+}
+const norm=1/Math.sqrt(meanSquare);
 for(let y=0;y<sh;y++)for(let x=0;x<sw;x++){
- const xx=x-centerX,yy=y-centerY,u=(xx*ca+yy*sa)/major,v=(-xx*sa+yy*ca)/minor;
- const theta=Math.atan2(v,u),rad=Math.hypot(u,v);
- const edge=1+.065*Math.sin(theta*3+cell.age*.8)+.04*Math.sin(theta*5-cell.age*.57)+.025*Math.sin(theta*7+cell.age*.41);
- const distEdge=(rad-edge)*Math.min(major,minor);
- const alpha=clamp(.5-distEdge/1.3,0,1);if(alpha<=0)continue;
- const highlight=clamp(.62-.22*u-.27*v,0,1),depth=clamp((edge-rad)*1.4,0,1),gloss=Math.pow(Math.max(0,1-Math.hypot(u+.32,v+.4)),5);
- const i=(y*sw+x)*4;pix[i]=Math.min(255,104+114*highlight+22*gloss);pix[i+1]=Math.min(255,152+89*highlight+15*depth);pix[i+2]=Math.min(255,157+88*highlight+18*gloss);pix[i+3]=Math.round(alpha*(110+135*clamp(cell.energy/65,0,1)));
+ const dx=x-cx,dy=y-cy,theta=Math.atan2(dy,dx),index=(theta+Math.PI)*n/(2*Math.PI);
+ // Radius lookup uses the same angular convention as lobe construction.
+ const t=((theta<0?theta+2*Math.PI:theta)*n/(2*Math.PI)),i0=Math.floor(t)%n,frac=t-Math.floor(t);
+ const boundary=base*norm*(radii[i0]*(1-frac)+radii[(i0+1)%n]*frac);
+ const distance=Math.hypot(dx,dy)-boundary,alpha=clamp(.5-distance/1.25,0,1);
+ if(alpha<=0)continue;
+ const u=dx/(boundary||1),v=dy/(boundary||1),light=clamp(.66-.19*u-.26*v,0,1),gloss=Math.pow(Math.max(0,1-Math.hypot(u+.35,v+.45)),5);
+ const idx=(y*sw+x)*4;pix[idx]=Math.min(255,95+125*light+28*gloss);pix[idx+1]=Math.min(255,147+99*light+12*gloss);pix[idx+2]=Math.min(255,153+96*light+18*gloss);pix[idx+3]=Math.round(alpha*(110+135*clamp(cell.energy/65,0,1)));
 }
 draw.skinCtx.putImageData(img,0,0);ctx.save();ctx.imageSmoothingEnabled=true;ctx.shadowColor='#b5e8e0';ctx.shadowBlur=5;ctx.drawImage(draw.skin,0,0,w,h);ctx.restore();
 
@@ -38,37 +47,31 @@ function chooseRequest(){const n=cell.experience;if(n<1)return ['Энергия?
 function step(dt){
  cell.age+=dt;cell.energy=Math.max(0,cell.energy-dt*(sources.length?.25:cell.energy>15?1.5:.7));cell.starve=clamp((30-cell.energy)/30,0,1);
  if(cell.age>=cell.nextWander||dist(cell.p,cell.wander)<9){cell.wander=randPos();cell.nextWander=cell.age+rnd(18,30)}
- // One coherent body, but food can be absorbed at every place its surface touches.
- const nearby=sources.map(s=>({s,d:dist(cell.p,s.p)})).sort((a,b)=>a.d-b.d);
- const closest=nearby[0];
- let target=cell.wander;
- if(closest){const group=nearby.filter(v=>v.d<=closest.d+36);
-  let wx=0,wy=0,wz=0,total=0;
-  for(const v of group){const weight=1/(14+v.d);wx+=v.s.p.x*weight;wy+=v.s.p.y*weight;wz+=v.s.p.z*weight;total+=weight}
-  target={x:wx/total,y:wy/total,z:wz/total};
- }
- cell.target=target;
- const dx=target.x-cell.p.x,dy=target.y-cell.p.y,d=Math.hypot(dx,dy,target.z-cell.p.z)||1;
- const desired=closest?clamp(closest.d/42,.55,1):.08;
- cell.stretch+=(desired-cell.stretch)*Math.min(1,dt*1.25);
- const speed=(closest?7.2:1.65)*(1-.55*cell.starve);
- cell.p.x=clamp(cell.p.x+dx/d*speed*dt,-85,85);cell.p.y=clamp(cell.p.y+dy/d*speed*dt,-85,85);cell.p.z=clamp(cell.p.z+(target.z-cell.p.z)/d*speed*dt,-85,85);
- // Match contact to the rendered elongated ellipse, not an arbitrary centre radius.
- const cp=project(cell.p),sp=project(target),heading=Math.atan2(sp.y-cp.y,sp.x-cp.x);
- const ca=Math.cos(heading),sa=Math.sin(heading),elong=1+cell.stretch*6.5;
- const base=clamp(Math.min(w,h)*.00255*zoom*11.5,4.2,12)*Math.sqrt(cell.mass);
- const major=base*Math.sqrt(elong),minor=base/Math.sqrt(elong);
+ const nearest=sources.length?sources.reduce((a,b)=>dist(cell.p,a.p)<dist(cell.p,b.p)?a:b):null;
+ const desired=sources.map(s=>({id:s.id,p:s.p,strength:clamp(1.9-dist(cell.p,s.p)/105,.28,1.55)}));
+ if(!sources.length)desired.push({id:-1,p:cell.wander,strength:.22});
+ if(!cell.lobes)cell.lobes=[];
+ for(const l of cell.lobes){const match=desired.find(d=>d.id===l.id);l.strength+=( (match?match.strength:0)-l.strength)*Math.min(1,dt*.7);if(match)l.p=match.p}
+ for(const d of desired)if(!cell.lobes.some(l=>l.id===d.id))cell.lobes.push({id:d.id,p:d.p,strength:0});
+ cell.lobes=cell.lobes.filter(l=>l.strength>.008||desired.some(d=>d.id===l.id));
+ // Whole-cell drift follows a weighted average of food gradients, without splitting the body.
+ let tx=0,ty=0,tz=0,weight=0;
+ for(const s of sources){const dd=dist(cell.p,s.p),v=1/(20+dd);tx+=s.p.x*v;ty+=s.p.y*v;tz+=s.p.z*v;weight+=v}
+ const target=weight?{x:tx/weight,y:ty/weight,z:tz/weight}:cell.wander;cell.target=target;
+ const dx=target.x-cell.p.x,dy=target.y-cell.p.y,dz=target.z-cell.p.z,d=Math.hypot(dx,dy,dz)||1;
+ const speed=(nearest?4.2:1.5)*(1-.5*cell.starve);
+ cell.p.x=clamp(cell.p.x+dx/d*speed*dt,-85,85);cell.p.y=clamp(cell.p.y+dy/d*speed*dt,-85,85);cell.p.z=clamp(cell.p.z+dz/d*speed*dt,-85,85);
+ // Feed every source whose 3D distance is within the whole organism's bounded reach.
  let finished=0;
  for(const source of [...sources]){
-  const q=project(source.p),ox=q.x-cp.x,oy=q.y-cp.y;
-  const along=(ox*ca+oy*sa)/major,across=(-ox*sa+oy*ca)/minor;
-  const touching=(along*along+across*across)<1.3;
-  const spatial=dist(cell.p,source.p)<19;
-  if(!touching||!spatial)continue;
+  const q=project(source.p),c=project(cell.p),theta=Math.atan2(q.y-c.y,q.x-c.x);
+  let growth=0;for(const l of cell.lobes){const p=project(l.p),a=Math.atan2(p.y-c.y,p.x-c.x),delta=Math.atan2(Math.sin(theta-a),Math.cos(theta-a));growth+=l.strength*Math.exp(-delta*delta/(2*.48*.48))}
+  const reach=11.5*(1+growth)*Math.sqrt(cell.mass);
+  if(dist(cell.p,source.p)>Math.min(35,reach+5))continue;
   const absorbed=Math.min(source.energy,dt*5);source.energy-=absorbed;cell.energy=clamp(cell.energy+absorbed,0,100);
   if(source.energy<=.001){sources.splice(sources.indexOf(source),1);cell.found++;cell.experience++;cell.memory.push({...source.p});cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);finished++}
  }
- if(finished){requestTime=cell.age+7;say(finished>1?'Я одновременно поглотила несколько источников и немного выросла.':'Я поглотила энергию, немного пополнела и продолжаю исследовать мир.')}
+ if(finished){requestTime=cell.age+7;say(finished>1?'Я поглотила несколько источников одновременно и немного выросла.':'Я поглотила энергию и продолжаю исследовать мир.')}
  if(!sources.length&&cell.energy<34&&cell.age>requestTime){say(chooseRequest());requestTime=cell.age+clamp(13-cell.experience*.5,6,13)}
 }
 function updateUI(){$('level').textContent=cell.experience;$('found').textContent=cell.found;$('reserve').textContent=Math.round(cell.energy)+'%';$('bar').style.width=cell.energy+'%';$('size').textContent=cell.size.toFixed(1)+'×';$('age').textContent=Math.floor(cell.age);$('available').textContent=sources.length;const mood=sources.length?'идёт к энергии':cell.energy<12?'сильно ослабла':cell.energy<34?'голодает':'исследует';$('mood').textContent=mood}
