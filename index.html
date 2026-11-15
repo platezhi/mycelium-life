@@ -1,468 +1,146 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mycelium Life — поиск энергии</title><style>
-*{box-sizing:border-box}body{margin:0;background:#071a23;color:#e3f4ec;font:15px system-ui}main{max-width:860px;margin:auto;padding:16px}h1{font-size:25px}canvas{width:100%;height:auto;background:#0b2931;border-radius:14px;display:block;touch-action:manipulation}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.stat{padding:12px;background:#16323a;border-radius:10px}.stat strong{display:block;font-size:21px}button{background:#27816c;color:white;border:0;padding:12px 16px;border-radius:9px;font-weight:600}small{color:#b2c9c3}pre{white-space:pre-wrap;word-break:break-word;background:#16323a;padding:12px;border-radius:9px}a{color:#91e5ce}input{width:100%;accent-color:#62d6a4}.controls{background:#16323a;padding:15px;border-radius:12px;margin:12px 0}.muted{color:#b2c9c3}.cell-chat{margin:8px 0;padding:10px 13px;background:#16323a;border-radius:9px;display:flex;align-items:center;gap:8px;font-size:14px}.cell-chat .speech{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}.cell-chat button{padding:5px 9px;flex-shrink:0}.quick-controls{display:flex;gap:8px;flex-wrap:wrap;margin:9px 0}.quick-controls button{flex:1;min-width:135px;padding:10px 12px}.quick-controls button.off{background:#bd3548}.species-stats{background:#16323a;padding:12px;border-radius:10px;margin:10px 0}.species-line{display:grid;grid-template-columns:13px minmax(70px,1fr) 95px 65px;gap:8px;align-items:center;font-size:12px;margin:7px 0}.species-line .bar{height:8px;background:#284a53;border-radius:8px;overflow:hidden}.species-line .fill{height:100%;background:#db6670}.species-stats .muted{font-size:12px}</style></head><body><main><h1>Мицелий — поиск энергии</h1><p>наследование цвета и скорости · препятствия · столкновения поколений</p><div class="stats"><div class="stat">Клеток<strong id="count">—</strong></div><div class="stat">Вирт. суток<strong id="day">—</strong></div><div class="stat">Родилось / погибло<strong id="events">—</strong></div></div><div class="quick-controls"><button id="restart">➕ Добавить 10 клеток</button><button id="toggleWalls" aria-pressed="false">🧱 Поставить стены</button></div><div id="cellChat" class="cell-chat" role="status" aria-live="off"><span id="cellSpeech" class="speech">💬 Клетки пока молчат…</span><button id="grantWish" hidden>Да</button><button id="denyWish" hidden>Нет</button></div><canvas id="world" width="760" height="520"></canvas><div class="species-stats"><b>⚔️ Потери видов и борьба за доминирование</b><div id="speciesLosses" class="muted">Пока потерь нет</div></div><div class="controls"><b>Эксперимент: источник энергии</b><p>Каждое касание поля добавляет новый источник, даже поверх клеток. Каждый источник содержит ровно 30 порций. Каждая подпитка расходует одну порцию; повторная подпитка той же клетки возможна через 0,25 виртуальных суток. Затем источник исчезает. Все клетки узнают об исчезновении. Красная кнопка отключает все источники. Касание клетки показывает её состояние.</p><label for="power">Мощность источника: <strong id="powerValue">100%</strong></label><input id="power" type="range" min="0" max="300" step="10" value="100"><p><strong id="sourceCount">Источников: 0</strong></p><p><button id="inspectMode">Режим: добавление источников</button></p><p><button id="removeSource" style="background:#bd3548;width:100%;font-size:17px;padding:17px">⛔ ОСТАНОВИТЬ ПОДАЧУ ЭНЕРГИИ</button></p><p><button id="start">Начать локальную симуляцию</button> <button id="pause">Пауза</button></p><small id="mode">Сначала загружается состояние из GitHub. Эксперимент в браузере не записывается в GitHub.</small></div><details class="controls" open><summary><b>⚙️ Условия жизни — шкалы</b></summary><p>Параметры локальной симуляции. Сохраняются на этом устройстве.</p><div id="sliders"></div><button id="resetRules">Сбросить настройки</button></details><p><button id="refresh">Загрузить состояние GitHub</button> <small id="updated"></small></p><h3>Клетка</h3><pre id="detail">Клетка не выбрана</pre><small>Под полем одна строка просьб к наблюдателю с кнопками «Да» и «Нет». За каждую просьбу клетка теряет один условный год жизни (в модели равен одним виртуальным суткам), независимо от ответа. «Да» может дать ей энергию или создать источник; «Нет» оставляет её без помощи. Каждая клетка просит не более одного раза. Эксперимент начинается с 10 клеток. Каждая клетка самостоятельно оценивает запас энергии, расстояние до источников, конкуренцию и дефицит пищи, выбирая поиск пищи, исследование или коллективное окружение. Её текущее решение видно в режиме просмотра клетки. В браузерном эксперименте время ускорено: около 1 виртуальных суток за 1 реальную секунду. В сохранённом расчёте GitHub 1 виртуальные сутки = 10 реальных минут. В мире не более 10 видов по фиксированным цветам. Новые клетки получают один из этих десяти цветов по кругу, потомки наследуют цвет родителя. Статистика смертей ведётся по цвету, а не по отдельной клетке. Скорость зависит от числа разных источников, от которых клетка питалась (1 — ×1, 2 — ×2, 3 — ×3), и наследуется потомками. Расход энергии замедлен в 50 раз, но продолжительность жизни задаётся в реальных виртуальных сутках и не продлевается питанием; накопление прогресса деления ускорено в 2 раза. Питание от нового источника повышает наследуемую скорость. Питание пополняет энергию, но не продлевает максимальный срок жизни. Клетки одного цвета составляют вид. Каждая смерть повышает общую память боли вида и ускоряет его атаки на 10% за потерю; цель — ассимилировать все другие виды, даже если еды достаточно. При изменении лимита жизни симуляция автоматически запускается; текущий возраст и число смертей видны в статусе. После первого питания клетка становится вдвое крупнее. Пройденная дистанция накапливает опыт навигации: опытные клетки используют кратчайшие пути по сетке с учётом стен, а потомки наследуют половину опыта. Стены нужно обходить; старшие по хронологическому возрасту клетки отталкивают младших. Когда клеток больше, чем оставшихся порций питания, группы по пять клеток одного цвета закрепляют состав команды и выбранную жертву, занимают позиции вокруг неё и обращают в свой вид при успешном окружении. У источников старшие клетки отталкивают младших. Движение, старение и размножение настраиваются шкалами. GitHub Actions ведёт отдельный сохранённый расчёт. Это модель, а не доказательство возникновения жизни.</small></main><script>
-const c=document.getElementById('world'),ctx=c.getContext('2d'),$=id=>document.getElementById(id);let cells=[],sources=[],inspectMode=false,sourceVersion=0,day=0,born=0,dead=0,running=false,last=0,acc=0,nextId=101,firstId=null;
-const definitions=[['life','Продолжительность жизни','сут.',1,30,1,7],['movement','Скорость движения','ед./сут.',0,80,1,23],['aging','Ускорение старения','%',0,100,5,30],['cost','Расход энергии при движении','%',0,50,1,5.5],['sense','Радиус обнаружения','ед.',5,150,5,32],['signal','Дальность сигнала','ед.',5,150,5,40],['repro','Порог размножения','ед.',1,20,.5,3.5],['bonus','Бонус первому','%',0,100,5,10],['tempo','Скорость времени','сут./сек.',.1,5,.1,1]];
-let lastCellSpeech=-Infinity,pendingWish=null,lastAskingCellId=-1;let speciesLosses=new Map(),speciesPain=new Map();let settings={};try{settings=JSON.parse(localStorage.getItem('mycelium-rules-v1')||'{}')}catch(e){}
-function val(k){const d=definitions.find(x=>x[0]===k);return Number(settings[k]??d[6])}
-function renderSliders(){const root=$('sliders');root.innerHTML='';for(const d of definitions){const wrap=document.createElement('div');wrap.style.margin='12px 0';const label=document.createElement('label');label.textContent=d[1]+': ';const output=document.createElement('strong');output.textContent=val(d[0])+' '+d[2];const input=document.createElement('input');input.type='range';input.min=d[3];input.max=d[4];input.step=d[5];input.value=val(d[0]);input.oninput=()=>{settings[d[0]]=Number(input.value);if(d[0]==='life'&&cells.length)running=true;output.textContent=input.value+' '+d[2];localStorage.setItem('mycelium-rules-v1',JSON.stringify(settings));draw()};label.appendChild(output);wrap.append(label,input);root.appendChild(wrap)}}
-$('resetRules').onclick=()=>{settings={};localStorage.removeItem('mycelium-rules-v1');renderSliders();draw()};renderSliders();
-const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-// Stable founder palette: every newly introduced cell gets its own color; offspring inherit it.
-const SPECIES_COLORS=['#ff6666','#60b9ff','#ffcb58','#75e39c','#c99bff','#ff93cf','#5ee1d5','#ff9b54','#b4d76b','#c1b7a8'];
-let colorSerial=0;
-function newColor(){return SPECIES_COLORS[(colorSerial++)%SPECIES_COLORS.length]}
-function speciesIndex(color){return SPECIES_COLORS.indexOf(color)}
-function normalizeSpecies(){
- // Older saved experiments may contain unlimited hues: fold them into ten stable colors.
- const unknown=[...new Set(cells.map(a=>a.color).filter(c=>speciesIndex(c)<0))];
- const mapped=new Map(unknown.map((color,i)=>[color,SPECIES_COLORS[i%SPECIES_COLORS.length]]));
- for(const a of cells)if(mapped.has(a.color))a.color=mapped.get(a.color);
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mycelium Life 3D — куб эволюции</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#07131c;color:#e8f5f4;font:14px system-ui}main{max-width:1100px;margin:auto;padding:12px}h1{font-size:22px;margin:8px 0}p{line-height:1.45;color:#b6cdd2}button,select{background:#185c66;color:#fff;border:1px solid #397783;border-radius:9px;padding:10px;font-weight:650;cursor:pointer}button:disabled{opacity:.45}.tools{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}.tools button{flex:1;min-width:130px}.chat{display:flex;align-items:center;gap:7px;background:#142d3a;border-radius:9px;padding:9px;margin:8px 0}.chat span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat button{padding:6px 11px}.scene{height:min(67vh,650px);min-height:340px;position:relative;border:1px solid #295467;border-radius:14px;overflow:hidden;background:radial-gradient(ellipse at center,#103445,#06121b)}canvas{display:block;touch-action:none}.hint{position:absolute;bottom:8px;left:10px;font-size:12px;color:#a9c9d0;pointer-events:none}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:10px 0}.stat{background:#142d3a;border-radius:9px;padding:9px}.stat b{display:block;font-size:20px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:10px}.panel{background:#142d3a;padding:12px;border-radius:10px;margin-top:10px}.species{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:9px;border-bottom:1px solid #264554;padding:6px 0;font-size:12px}.dot{height:11px;width:11px;border-radius:50%}small{color:#b5ced0}pre{white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;font-size:12px}.badge{display:inline-block;border-radius:6px;background:#244b57;padding:3px 6px;margin:2px}label{display:block;margin:8px 0}input[type=checkbox]{accent-color:#5dc7b3}@media(max-width:650px){.columns{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.scene{height:55vh;min-height:300px}.tools button{min-width:100px;font-size:12px}}
+</style></head><body><main>
+<h1>🧬 Mycelium Life 3D — куб эволюции</h1>
+<p>10 цветовых видов · свободный полёт в объёме · энергия = знания · самостоятельные решения · ограничение характеристик ×5</p>
+<div class="stats"><div class="stat">Клеток<b id="count">10</b></div><div class="stat">День<b id="day">0</b></div><div class="stat">Источников<b id="sources">0</b></div><div class="stat">Погибло<b id="dead">0</b></div></div>
+<div class="tools"><button id="add">➕ 10 клеток</button><button id="energy">⚡ Случайная энергия</button><button id="walls">🧱 Поставить стены</button><button id="pause">⏸ Пауза</button><button id="reset">↻ Новый мир</button></div>
+<div class="chat"><span id="speech">💬 Клетки пока молчат…</span><button id="yes" hidden>Да</button><button id="no" hidden>Нет</button></div>
+<div class="scene" id="scene"><div class="hint">Пальцем вращать · двумя пальцами приближать · касание клетки — наблюдать</div></div>
+<div class="tools"><button id="overview">◈ Весь куб</button><button id="follow">◎ Следить за клеткой</button><button id="xray">◉ Рентген: выкл.</button><button id="events">✦ События: вкл.</button></div>
+<div class="columns"><section class="panel"><b>Виды и потери</b><div id="species"></div></section><section class="panel"><b>Выбранная клетка</b><pre id="detail">Коснитесь клетки в кубе</pre><small>Питание, знания и мутации расходуют общий запас энергии. У каждой клетки собственные решения.</small></section></div>
+<section class="panel"><b>Журнал эволюции</b><div id="log"><small>Мир создан. Источников энергии пока нет.</small></div></section>
+<p><small>Встроенная библиотека содержит упрощённые идеи биологии и стратегии. Прямого подключения к интернету или ИИ-модели у клеток пока нет: новые решения возникают из правил симуляции и их опыта.</small></p>
+</main><script src="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js"></script>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const COLORS=['#ff676b','#63baff','#ffd166','#74e2a0','#c6a0ff','#ff94d0','#61ded7','#ffa15e','#b6d86b','#b8becd'];
+const NAMES=['Разведчики','Стражи','Стратеги','Собиратели','Адаптеры','Охотники','Исследователи','Скороходы','Защитники','Кооператоры'];
+const KEYS=['speed','armor','sensing','efficiency','learning','attack','learning','speed','armor','cooperation'];
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),rnd=(a,b)=>a+Math.random()*(b-a);
+const sceneEl=$('scene');
+if(!window.THREE){sceneEl.innerHTML='<p style="padding:25px">Не удалось загрузить Three.js. Проверьте подключение к интернету и обновите страницу.</p>';return}
+const T=THREE,scene=new T.Scene(),camera=new T.PerspectiveCamera(55,1,.1,1200);
+const renderer=new T.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));sceneEl.prepend(renderer.domElement);
+scene.add(new T.AmbientLight(0xb5e8ff,1.2));const light=new T.PointLight(0xffffff,85);light.position.set(90,120,100);scene.add(light);
+const cube=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(200,200,200)),new T.LineBasicMaterial({color:0x6dc6e4,transparent:true,opacity:.7}));scene.add(cube);
+const shell=new T.Mesh(new T.BoxGeometry(200,200,200),new T.MeshBasicMaterial({color:0x3c8fa8,transparent:true,opacity:.025,side:T.BackSide,depthWrite:false}));scene.add(shell);
+const cellGeo=new T.SphereGeometry(1,16,12),srcGeo=new T.IcosahedronGeometry(4,1);
+const raycaster=new T.Raycaster(),pointer=new T.Vector2();
+let cells=[],sources=[],walls=[],nextId=1,day=0,dead=0,running=true,last=performance.now(),selected=null,follow=false,xray=false,autoEvents=true,pending=null,lastAsk=-100,askedId=0,frameN=0,orbit={theta:.8,phi:1.1,dist:345},target=new T.Vector3(),drag=null;
+const stats=COLORS.map(()=>({dead:0,conversions:0})),knowledge=['жгутик: скорость','панцирь: защита','отросток: атака','хеморецептор: поиск','кооперация: окружение','экономия: эффективность','ложный манёвр: стратегия','разведка: стратегия'];
+const randPos=()=>new T.Vector3(rnd(-85,85),rnd(-85,85),rnd(-85,85));
+const makeMat=(c,opacity=1)=>new T.MeshPhongMaterial({color:c,emissive:c,emissiveIntensity:.12,transparent:opacity<1,opacity,shininess:90});
+function event(s){const p=document.createElement('div');p.textContent='День '+day.toFixed(1)+' · '+s;$('log').prepend(p);while($('log').children.length>9)$('log').lastChild.remove()}
+function traits(i){const v={speed:1,armor:1,sensing:1,efficiency:1,learning:1,attack:1,cooperation:1};v[KEYS[i]]=1.3;return v}
+function addCell(kind,pos,parent){
+ const mesh=new T.Mesh(cellGeo,makeMat(COLORS[kind]));mesh.scale.setScalar(3.3);mesh.position.copy(pos||randPos());scene.add(mesh);
+ const a={id:nextId++,kind,mesh,energy:parent?parent.energy*.45:7,age:0,life:parent?parent.life:28,traits:parent?{...parent.traits}:traits(kind),fed:new Set(),experience:0,genes:parent?parent.genes:0,arm:parent?parent.arm:false,shell:parent?parent.shell:false,knowledge:parent?[...parent.knowledge]:[],target:null,velocity:new T.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).normalize(),goal:'исследование',asked:false,attackCooldown:0};
+ mesh.userData.cell=a;cells.push(a);updateShape(a);return a
 }
-// Fixed maze-like obstacles; gaps remain so every area is reachable.
-let wallsEnabled=false;
-let walls=[];
-function randomWalls(){
- const result=[],count=8+Math.floor(Math.random()*5),margin=20;
- for(let tries=0;tries<300&&result.length<count;tries++){
-  const vertical=Math.random()<.5,len=65+Math.floor(Math.random()*105);
-  const w=vertical?13:len,ht=vertical?len:13;
-  const wall={x:margin+Math.random()*(760-w-2*margin),y:margin+Math.random()*(520-ht-2*margin),w,h:ht};
-  const near=(p,pad)=>p.x+pad>wall.x&&p.x-pad<wall.x+w&&p.y+pad>wall.y&&p.y-pad<wall.y+ht;
-  if(cells.some(a=>near(a,radius(a)+12))||sources.some(s=>near(s,18)))continue;
-  if(result.some(v=>wall.x<v.x+v.w+26&&wall.x+w+26>v.x&&wall.y<v.y+v.h+26&&wall.y+ht+26>v.y))continue;
-  result.push(wall);
- }
- return result;
+function updateShape(a){
+ const m=a.mesh;
+ if(a.shell&&!m.userData.shell){const armor=new T.Mesh(new T.IcosahedronGeometry(4.25,1),new T.MeshPhongMaterial({color:COLORS[a.kind],wireframe:true,transparent:true,opacity:.5}));m.add(armor);m.userData.shell=armor}
+ if(!a.shell&&m.userData.shell){m.remove(m.userData.shell);m.userData.shell.geometry.dispose();m.userData.shell.material.dispose();delete m.userData.shell}
+ if(a.arm&&!m.userData.arm){const arm=new T.Mesh(new T.CylinderGeometry(.35,.6,7,7),makeMat(COLORS[a.kind]));arm.rotation.z=Math.PI/2;arm.position.x=5.5;m.add(arm);m.userData.arm=arm}
+ if(!a.arm&&m.userData.arm){m.remove(m.userData.arm);m.userData.arm.geometry.dispose();m.userData.arm.material.dispose();delete m.userData.arm}
 }
-function radius(a){return a.fedOnce?9:4.5}
-function blocked(x,y,r=5){
- return wallsEnabled&&walls.some(w=>x+r>w.x&&x-r<w.x+w.w&&y+r>w.y&&y-r<w.y+w.h)
+function removeCell(a){scene.remove(a.mesh);a.mesh.traverse(o=>{if(o.geometry&&o!==a.mesh)o.geometry.dispose();if(o.material)o.material.dispose()});a.mesh.geometry=cellGeo;cells.splice(cells.indexOf(a),1);if(selected===a){selected=null;follow=false}stats[a.kind].dead++;dead++}
+function spawnEnergy(){
+ const pos=randPos(),mesh=new T.Mesh(srcGeo,new T.MeshPhongMaterial({color:0xffd15a,emissive:0xe5a334,emissiveIntensity:.7}));mesh.position.copy(pos);scene.add(mesh);
+ const s={id:Date.now()+Math.random(),pos,mesh,units:10};sources.push(s);event('Источник энергии появился в случайной точке куба (10 единиц)');return s
 }
-function moveWithWalls(a,dx,dy){
- const r=radius(a),oldX=a.x,oldY=a.y;
- const nx=clamp(a.x+dx,r,760-r),ny=clamp(a.y+dy,r,520-r);
- if(!blocked(nx,a.y,r))a.x=nx;
- if(!blocked(a.x,ny,r))a.y=ny;
- if(Math.hypot(a.x-oldX-dx,a.y-oldY-dy)>Math.max(1,Math.hypot(dx,dy)*.4)){
-   a.heading+=((a.id%2)?1:-1)*(Math.PI/2+(Math.random()-.5)*.5);
- }
+function addWall(){
+ const horizontal=Math.random()<.5,geo=new T.BoxGeometry(horizontal?rnd(35,75):5,rnd(25,60),horizontal?5:rnd(35,75));
+ const mesh=new T.Mesh(geo,new T.MeshPhongMaterial({color:0x5d9cae,transparent:true,opacity:.34,side:T.DoubleSide}));mesh.position.copy(randPos().multiplyScalar(.75));scene.add(mesh);walls.push(mesh)
 }
-// Navigation memory: experienced travellers learn obstacle-aware shortest routes.
-const NAV=20,NX=38,NY=26;
-let navCache=new Map();
-function navField(s){
- const cached=navCache.get(s.id);if(cached)return cached;
- const n=NX*NY,distances=new Float64Array(n);distances.fill(Infinity);
- const blockedGrid=new Uint8Array(n);
- for(let y=0;y<NY;y++)for(let x=0;x<NX;x++)blockedGrid[y*NX+x]=blocked(x*NAV+NAV/2,y*NAV+NAV/2,10)?1:0;
- let sx=clamp(Math.floor(s.x/NAV),0,NX-1),sy=clamp(Math.floor(s.y/NAV),0,NY-1),root=sy*NX+sx;
- if(blockedGrid[root]){
-  let best=Infinity;for(let i=0;i<n;i++)if(!blockedGrid[i]){
-   const d=Math.hypot((i%NX)*NAV+10-s.x,Math.floor(i/NX)*NAV+10-s.y);
-   if(d<best){best=d;root=i}
+function removeWalls(){walls.forEach(m=>{scene.remove(m);m.geometry.dispose();m.material.dispose()});walls=[]}
+function reset(){
+ cells.forEach(a=>{scene.remove(a.mesh);a.mesh.traverse(o=>{if(o.material)o.material.dispose()})});cells=[];sources.forEach(s=>{scene.remove(s.mesh);s.mesh.material.dispose()});sources=[];removeWalls();nextId=1;day=0;dead=0;pending=null;selected=null;follow=false;lastAsk=-100;askedId=0;stats.forEach(s=>{s.dead=0;s.conversions=0});$('speech').textContent='💬 Клетки пока молчат…';$('yes').hidden=$('no').hidden=true;$('log').textContent='';for(let i=0;i<10;i++)addCell(i);event('Созданы 10 видов с разными стартовыми преимуществами');running=true;$('pause').textContent='⏸ Пауза'
+}
+function chooseTarget(a){
+ let best=null,score=-Infinity;
+ for(const s of sources){if(s.units<=0||a.fed.has(s.id))continue;const d=a.mesh.position.distanceTo(s.pos),v=30-d*.2+s.units*.4;if(v>score){score=v;best=s}}
+ return best
+}
+function evolve(a){
+ if(a.energy<4||a.experience<2)return;
+ const rivals=cells.filter(b=>b.kind!==a.kind&&b.mesh.position.distanceTo(a.mesh.position)<40).length;
+ const own=cells.filter(b=>b.kind===a.kind&&b.mesh.position.distanceTo(a.mesh.position)<40).length;
+ const choice=rivals>own?'armor':rivals>0?'attack':sources.length?'speed':'sensing';
+ const possible=['speed','armor','sensing','efficiency','learning','attack','cooperation'];
+ const key=Math.random()<.35?possible[Math.floor(Math.random()*possible.length)]:choice;
+ const cost=2.5/a.traits.efficiency;
+ if(a.traits[key]>=5||a.energy<cost)return;
+ a.energy-=cost;a.experience-=2;a.traits[key]=Math.min(5,+(a.traits[key]*1.1).toFixed(3));a.genes++;
+ const concept=knowledge[Math.floor(Math.random()*knowledge.length)];if(!a.knowledge.includes(concept))a.knowledge.push(concept);
+ if(key==='armor'&&a.traits.armor>=1.5)a.shell=true;
+ if(key==='attack'&&a.traits.attack>=1.5)a.arm=true;
+ updateShape(a);if(a===selected||Math.random()<.06)event('Клетка №'+a.id+' улучшила '+key+' на 10%, изучила «'+concept+'»')
+}
+function tick(dt){
+ day+=dt;
+ for(const a of [...cells]){
+  a.age+=dt;a.attackCooldown=Math.max(0,a.attackCooldown-dt);
+  a.energy-=dt*(.14+.025*a.traits.speed+.035*(a.arm?1:0)+.035*(a.shell?1:0))/a.traits.efficiency;
+  if(a.age>a.life||a.energy<=0){removeCell(a);continue}
+  if(a.experience>=2)evolve(a);
+  let dest=chooseTarget(a);a.target=dest;
+  const p=a.mesh.position;
+  const enemies=cells.filter(b=>b.kind!==a.kind&&p.distanceTo(b.mesh.position)<35);
+  const friends=cells.filter(b=>b.kind===a.kind&&b!==a&&p.distanceTo(b.mesh.position)<40);
+  if(dest){a.goal='поиск энергии';a.velocity.addScaledVector(dest.pos.clone().sub(p).normalize(),dt*7)}
+  else if(enemies.length&&friends.length>=3){a.goal='окружение';a.velocity.addScaledVector(enemies[0].mesh.position.clone().sub(p).normalize(),dt*7)}
+  else{a.goal='разведка';a.velocity.add(new T.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).multiplyScalar(dt*.6))}
+  if(a.velocity.lengthSq()<.0001)a.velocity.set(1,0,0);a.velocity.normalize();
+  const step=dt*7*a.traits.speed;
+  p.addScaledVector(a.velocity,step);
+  for(const axis of ['x','y','z']){if(p[axis]>94){p[axis]=94;a.velocity[axis]*=-1}if(p[axis]<-94){p[axis]=-94;a.velocity[axis]*=-1}}
+  for(const w of walls){const box=new T.Box3().setFromObject(w);if(box.distanceToPoint(p)<4){p.addScaledVector(a.velocity,-step*2);a.velocity.multiplyScalar(-1)}}
+  if(dest&&p.distanceTo(dest.pos)<8&&dest.units>0&&!a.fed.has(dest.id)){
+   dest.units--;a.fed.add(dest.id);a.energy=Math.min(12,a.energy+3);a.experience+=1.5*a.traits.learning;a.goal='получена энергия → знания';a.target=null;
+   if(dest.units<=0){scene.remove(dest.mesh);dest.mesh.material.dispose();sources.splice(sources.indexOf(dest),1)}
   }
- }
- const visited=new Uint8Array(n);distances[root]=0;
- const directions=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
- for(let k=0;k<n;k++){
-  let at=-1,best=Infinity;
-  for(let i=0;i<n;i++)if(!visited[i]&&distances[i]<best){best=distances[i];at=i}
-  if(at<0)break;visited[at]=1;
-  const x=at%NX,y=Math.floor(at/NX);
-  for(const [dx,dy] of directions){
-   const xx=x+dx,yy=y+dy;if(xx<0||xx>=NX||yy<0||yy>=NY)continue;
-   const to=yy*NX+xx;if(blockedGrid[to])continue;
-   if(dx&&dy&&(blockedGrid[y*NX+xx]||blockedGrid[yy*NX+x]))continue;
-   const d=best+Math.hypot(dx,dy)*NAV;
-   if(d<distances[to])distances[to]=d;
+  if(enemies.length&&friends.length>=3&&a.attackCooldown===0){
+   const victim=enemies[0],surround=cells.filter(b=>b.kind===a.kind&&b.mesh.position.distanceTo(victim.mesh.position)<16);
+   if(surround.length>=5){victim.kind=a.kind;victim.mesh.material.color.set(COLORS[a.kind]);victim.mesh.material.emissive.set(COLORS[a.kind]);victim.traits={...victim.traits};victim.fed.clear();victim.arm=false;victim.shell=false;updateShape(victim);stats[a.kind].conversions++;a.attackCooldown=1;event('Вид '+(a.kind+1)+' ассимилировал клетку №'+victim.id)}
   }
+  if(a.energy>9&&a.age>2&&cells.length<250&&Math.random()<dt*.08){a.energy*=.55;addCell(a.kind,p.clone().add(new T.Vector3(rnd(-5,5),rnd(-5,5),rnd(-5,5))),a)}
  }
- const field={distances,blockedGrid};navCache.set(s.id,field);return field;
+ if(day-lastAsk>2&&!pending&&cells.length){const eligible=cells.filter(a=>!a.asked&&a.age<a.life-1).sort((a,b)=>a.id-b.id);const a=eligible.find(a=>a.id>askedId)||eligible[0];if(a){a.asked=true;askedId=a.id;a.life=Math.max(a.age+.2,a.life-1);pending=a;$('speech').textContent='💬 Клетка №'+a.id+': «Дашь мне энергию для знаний?» (−1 год жизни)';$('yes').hidden=$('no').hidden=false}}
 }
-function experiencedRoute(a){
- if(!sources.length)return null;
- let chosen=null,best=Infinity;
- const x=clamp(Math.floor(a.x/NAV),0,NX-1),y=clamp(Math.floor(a.y/NAV),0,NY-1),idx=y*NX+x;
- for(const s of sources){
-  if((a.fedSources||[]).includes(s.id)||s.remaining<=0||s.power<=0)continue;
-  const field=navField(s),d=field.distances[idx];
-  if(d<best){best=d;chosen={s,field}}
- }
- if(!chosen||!Number.isFinite(best))return null;
- let waypoint=null,score=best;
- for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-  if(!dx&&!dy)continue;
-  const xx=x+dx,yy=y+dy;if(xx<0||xx>=NX||yy<0||yy>=NY)continue;
-  const j=yy*NX+xx;
-  if(chosen.field.blockedGrid[j])continue;
-  if(dx&&dy&&(chosen.field.blockedGrid[y*NX+xx]||chosen.field.blockedGrid[yy*NX+x]))continue;
-  if(chosen.field.distances[j]<score-0.1){score=chosen.field.distances[j];waypoint={x:xx*NAV+10,y:yy*NAV+10}}
- }
- return {source:chosen.s,waypoint:waypoint||{x:chosen.s.x,y:chosen.s.y}};
+function answer(yes){if(!pending)return;const a=pending;pending=null;if(yes&&cells.includes(a)){a.energy=Math.min(12,a.energy+3);a.experience+=1}lastAsk=day;$('speech').textContent='💬 Клетка №'+a.id+': '+(yes?'«Спасибо, я смогу развиваться!»':'«Поняла, буду искать сама».');$('yes').hidden=$('no').hidden=true}
+$('yes').onclick=()=>answer(true);$('no').onclick=()=>answer(false);
+$('add').onclick=()=>{for(let i=0;i<10&&cells.length<250;i++)addCell(i);event('Добавлены 10 клеток существующих видов')};
+$('energy').onclick=spawnEnergy;
+$('walls').onclick=()=>{if(walls.length){removeWalls();$('walls').textContent='🧱 Поставить стены'}else{for(let i=0;i<8;i++)addWall();$('walls').textContent='🚧 Убрать стены'}};
+$('pause').onclick=()=>{running=!running;$('pause').textContent=running?'⏸ Пауза':'▶ Продолжить'};
+$('reset').onclick=reset;
+$('overview').onclick=()=>{follow=false;selected=null;target.set(0,0,0);orbit.dist=345};
+$('follow').onclick=()=>{if(selected)follow=!follow;else event('Для слежения сначала выберите клетку')};
+$('xray').onclick=()=>{xray=!xray;for(const a of cells){a.mesh.material.depthTest=!xray;a.mesh.material.transparent=xray;a.mesh.material.opacity=xray?.82:1}for(const w of walls)w.material.opacity=xray?.08:.34;$('xray').textContent='◉ Рентген: '+(xray?'вкл.':'выкл.')};
+$('events').onclick=()=>{autoEvents=!autoEvents;$('events').textContent='✦ События: '+(autoEvents?'вкл.':'выкл.')};
+function updateUI(){
+ $('count').textContent=cells.length;$('day').textContent=day.toFixed(1);$('sources').textContent=sources.length;$('dead').textContent=dead;
+ const counts=COLORS.map((_,i)=>cells.filter(a=>a.kind===i).length);
+ $('species').replaceChildren(...COLORS.map((c,i)=>{const d=document.createElement('div');d.className='species';const sw=document.createElement('i');sw.className='dot';sw.style.background=c;const name=document.createElement('span');name.textContent=(i+1)+'. '+NAMES[i]+' · живых '+counts[i];const value=document.createElement('span');value.textContent='☠ '+stats[i].dead+' · ⇄ '+stats[i].conversions;d.append(sw,name,value);return d}));
+ if(selected&&cells.includes(selected)){const a=selected;$('detail').textContent='№'+a.id+' · '+NAMES[a.kind]+'\nВозраст '+a.age.toFixed(1)+' / '+a.life.toFixed(1)+'\nЭнергия '+a.energy.toFixed(2)+'\nОпыт '+a.experience.toFixed(1)+'\nРешение: '+a.goal+'\nУлучшения: '+a.genes+'\nКонечность: '+(a.arm?'да':'нет')+' · панцирь: '+(a.shell?'да':'нет')+'\n'+Object.entries(a.traits).map(([k,v])=>k+': ×'+v.toFixed(2)).join('\n')+'\nЗнания: '+(a.knowledge.join(', ')||'пока нет')}
 }
-function spawnPoint(){
- for(let i=0;i<100;i++){
-  const p={x:30+Math.random()*700,y:30+Math.random()*460};
-  if(!blocked(p.x,p.y,10))return p;
- }
- return {x:30,y:30};
-}
-function resolveCellCollisions(dt){
- const size=24,buckets=new Map();
- for(const a of cells){const gx=Math.floor(a.x/size),gy=Math.floor(a.y/size),key=gx+','+gy;
-  if(!buckets.has(key))buckets.set(key,[]);
-  buckets.get(key).push(a);
- }
- const seen=new Set();
- for(const a of cells){
-  const gx=Math.floor(a.x/size),gy=Math.floor(a.y/size);
-  for(let ix=-1;ix<=1;ix++)for(let iy=-1;iy<=1;iy++){
-   for(const b of buckets.get((gx+ix)+','+(gy+iy))||[]){
-    if(a.id===b.id)continue;
-    const pair=Math.min(a.id,b.id)+':'+Math.max(a.id,b.id);
-    if(seen.has(pair))continue;seen.add(pair);
-    const d=dist(a,b),limit=radius(a)+radius(b)+2;
-    if(d>=limit)continue;
-    // Chronological age is not reset by feeding.
-    const ageA=day-(a.birthDay??0),ageB=day-(b.birthDay??0);
-    if(Math.abs(ageA-ageB)<.1)continue;
-    const elder=ageA>ageB?a:b,younger=elder===a?b:a;
-    if(day<(younger.pushedUntil||0))continue;
-    if(younger.huntingTarget||elder.huntingTarget)continue;
-    // Elders dominate access to food; active attackers can keep their encirclement.
-    if(!sources.some(s=>dist(elder,s)<90||dist(younger,s)<90))continue;
-    if(elder.color!==younger.color&&elder.huntingTarget===younger.id)continue;
-    const angle=Math.atan2(younger.y-elder.y,younger.x-elder.x);
-    const direction=Number.isFinite(angle)?angle:Math.random()*Math.PI*2;
-    const strength=14;
-    moveWithWalls(younger,Math.cos(direction)*strength,Math.sin(direction)*strength);
-    younger.heading=direction;younger.pushedUntil=day+.25;
-   }
-  }
- }
-}
-// Scarcity drives cooperative hunting between feedings.
-let huntTeams=new Map();
-function recordDeath(a){
- dead++;
- const kind=a.color||'#73d8ff';
- speciesLosses.set(kind,(speciesLosses.get(kind)||0)+1);
- speciesPain.set(kind,(speciesPain.get(kind)||0)+1);
- // All living relatives inherit the accumulated loss count, even if they have never met.
- for(const relative of cells)if(relative.color===kind){
-  relative.mind=relative.mind||{};
-  relative.mind.pain=speciesPain.get(kind);
-  relative.mind.aggression=1+.1*relative.mind.pain;
- }
-}
-function aggression(a){return 1+.1*(speciesPain.get(a.color)||0)}
-function renderSpeciesLosses(){
- const root=$('speciesLosses');
- const living=new Map();
- for(const a of cells)living.set(a.color,(living.get(a.color)||0)+1);
- const kinds=SPECIES_COLORS.filter(k=>living.has(k)||(speciesLosses.get(k)||0)>0);
- if(!kinds.length){root.textContent='Пока видов нет';return}
- const max=Math.max(1,...kinds.map(k=>speciesLosses.get(k)||0));
- root.replaceChildren();
- kinds.sort((a,b)=>(speciesLosses.get(b)||0)-(speciesLosses.get(a)||0)||speciesIndex(a)-speciesIndex(b));
- for(const [i,kind] of kinds.entries()){
-  const n=speciesLosses.get(kind)||0,alive=living.get(kind)||0;
-  const line=document.createElement('div');line.className='species-line';
-  const swatch=document.createElement('span');swatch.style.cssText='background:'+kind+';width:12px;height:12px;border-radius:50%';
-  const name=document.createElement('span');name.textContent='Вид '+(speciesIndex(kind)+1)+' · живых '+alive;
-  const bar=document.createElement('div');bar.className='bar';
-  const fill=document.createElement('div');fill.className='fill';fill.style.width=(n/max*100)+'%';bar.appendChild(fill);
-  const label=document.createElement('span');label.textContent='☠ '+n+' · +'+(n*10)+'%';
-  line.append(swatch,name,bar,label);root.appendChild(line);
- }
-}
-function huntingOrders(){
- const orders=new Map(),clans=new Map();
- for(const a of cells){if(!clans.has(a.color))clans.set(a.color,[]);clans.get(a.color).push(a)}
- const shortage=new Set(cells.map(a=>a.color)).size>1;
- const rivalColors=clans.size>1;
- if(!rivalColors){huntTeams.clear();return orders}
- const alive=new Map(cells.map(a=>[a.id,a]));
- for(const color of [...huntTeams.keys()])if(!clans.has(color))huntTeams.delete(color);
- for(const [color,members] of clans){
-  if(members.length<5){huntTeams.delete(color);continue}
-  let team=huntTeams.get(color);
-  if(!team||!alive.has(team.victimId)||alive.get(team.victimId).color===color||
-    team.attackerIds.some(id=>!alive.has(id))){
-   let victim=null,best=Infinity;
-   for(const other of cells){
-    if(other.color===color)continue;
-    const nearest=[...members].sort((a,b)=>dist(a,other)-dist(b,other)).slice(0,5);
-    const score=nearest.reduce((sum,a)=>sum+dist(a,other)/aggression(a),0);
-    if(score<best){best=score;victim=other}
-   }
-   if(!victim){huntTeams.delete(color);continue}
-   const attackers=[...members].sort((a,b)=>dist(a,victim)-dist(b,victim)).slice(0,5);
-   // Assign stable slots by their actual angles to avoid crossing paths.
-   attackers.sort((a,b)=>Math.atan2(a.y-victim.y,a.x-victim.x)-Math.atan2(b.y-victim.y,b.x-victim.x));
-   team={victimId:victim.id,attackerIds:attackers.map(a=>a.id)};
-   huntTeams.set(color,team);
-  }
-  const victim=alive.get(team.victimId);
-  if(!victim)continue;
-  const base=team.baseAngle??Math.atan2(alive.get(team.attackerIds[0]).y-victim.y,alive.get(team.attackerIds[0]).x-victim.x);
-  team.baseAngle=base;
-  team.attackerIds.forEach((id,i)=>orders.set(id,{victim,angle:base+i*Math.PI*2/5}));
- }
- return orders;
-}
-// Five touching attackers of one lineage must surround the victim angularly.
-function resolveEncirclements(){
- const converted=new Set();
- for(const victim of cells){
-  if(converted.has(victim.id))continue;
-  const groups=new Map();
-  for(const other of cells){
-   if(other.id===victim.id||other.color===victim.color||converted.has(other.id))continue;
-   const d=dist(victim,other);
-   if(d>radius(victim)+radius(other)+13)continue;
-   const angle=Math.atan2(other.y-victim.y,other.x-victim.x);
-   if(!groups.has(other.color))groups.set(other.color,[]);
-   groups.get(other.color).push({cell:other,angle});
-  }
-  for(const [color,group] of groups){
-   if(group.length<5)continue;
-   group.sort((a,b)=>a.angle-b.angle);
-   const angles=group.map(g=>g.angle);
-   let maxGap=0;
-   for(let i=0;i<angles.length;i++){
-    const next=i===angles.length-1?angles[0]+Math.PI*2:angles[i+1];
-    maxGap=Math.max(maxGap,next-angles[i]);
-   }
-   if(maxGap>Math.PI*.9)continue;
-   // Assimilation: the surrounded cell survives and joins the attackers' lineage.
-   victim.color=color;
-   victim.mind=victim.mind||{};
-   victim.mind.pain=speciesPain.get(color)||0;
-   victim.mind.aggression=aggression(victim);
-   victim.huntingTarget=null;
-   victim.stuckUntil=Math.max(victim.stuckUntil||0,day+.35);
-   converted.add(victim.id);
-   for(const g of group)g.cell.stuckUntil=Math.max(g.cell.stuckUntil||0,day+.35);
-   huntTeams.clear();
-   break;
-  }
- }
-}
-function draw(){
- ctx.clearRect(0,0,760,520);
- if(wallsEnabled){ctx.fillStyle='#617b88';for(const w of walls)ctx.fillRect(w.x,w.y,w.w,w.h)}
- for(const s of sources){
-   const rad=val('sense')+s.power*.13;
-   ctx.fillStyle='rgba(255,203,92,.12)';ctx.beginPath();ctx.arc(s.x,s.y,rad,0,Math.PI*2);ctx.fill();
-   ctx.fillStyle='#ffcb5c';ctx.beginPath();ctx.arc(s.x,s.y,9,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff3c2';ctx.font='bold 12px system-ui';ctx.fillText(String(s.remaining),s.x+12,s.y-9);
-   ctx.strokeStyle='#ffd88c';ctx.stroke();
- }
- ctx.lineWidth=1;
- for(const a of cells){
-   if(a.known){ctx.strokeStyle='rgba(120,215,250,.11)';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(a.known.x,a.known.y);ctx.stroke()}
- }
- for(const a of cells){
-   ctx.fillStyle=a.color||'#73d8ff';
-   ctx.beginPath();ctx.arc(a.x,a.y,radius(a),0,Math.PI*2);ctx.fill();
- }
- renderSpeciesLosses();
- $('sourceCount').textContent='Источников: '+sources.length;$('count').textContent=cells.length;$('day').textContent=day.toFixed(2);$('events').textContent=born+' / '+dead;
- $('mode').textContent=(running?'▶ Симуляция идёт':'⏸ Симуляция остановлена')+' · Лимит жизни: '+val('life')+' сут. · Самая старая клетка: '+(cells.length?Math.max(...cells.map(a=>Math.max(0,day-(a.birthDay??day)))).toFixed(2):'—')+' сут. · Умерло: '+dead+' · Версия 1.9';
-}
-// Independent, explainable decision-maker for every cell.
-function cellDecision(a,orders){
- const memory=a.mind||(a.mind={visits:0,failedMoves:0,mode:'исследование',lastX:a.x,lastY:a.y});
- const remaining=sources.reduce((sum,s)=>sum+s.remaining,0);
- const hunger=(a.energy??1)<1.25;
- const scarcity=remaining<cells.length;
- const hunt=orders.get(a.id);
- const route=(a.distanceTravelled||0)>40?experiencedRoute(a):null;
- let target=null,score=-Infinity;
- for(const s of sources){
-  if(s.remaining<=0||s.power<=0||(a.fedSources||[]).includes(s.id))continue;
-  const distance=route&&route.source.id===s.id?dist(a,route.waypoint):dist(a,s);
-  const nearby=cells.filter(b=>b.id!==a.id&&dist(b,s)<65).length;
-  const value=s.remaining*.045+s.power*.005-distance*.012-nearby*(scarcity?.4:.15);
-  if(value>score){score=value;target=s}
- }
- let mode='исследование';
- if(hunt&&!hunger)mode='окружение';
- else if(target)mode=hunger?'срочный поиск пищи':'поиск пищи';
- else if(hunt)mode='окружение';
- else mode='исследование';
- memory.mode=mode;
- memory.targetId=mode==='окружение'?hunt.victim.id:target?.id??null;
- memory.reason=mode==='окружение'?'борьба видов; боль '+(a.pain||0)+', агрессия +'+Math.round((a.aggression||0)*100)+'%':target?'оценка энергии, расстояния и конкуренции':'источников нет';
- memory.pain=speciesPain.get(a.color)||0;
- memory.aggression=aggression(a);
- memory.goal='Оставить в мире только свой вид';
- memory.visits++;
- return {mode,target,route:route&&route.source.id===target?.id?route:null,hunt:mode==='окружение'?hunt:null};
-}
-function showWish(text,waiting=false){
- $('cellSpeech').textContent=text;
- $('grantWish').hidden=!waiting;
- $('denyWish').hidden=!waiting;
-}
-function cellSpeech(){
- if(pendingWish||!cells.length)return;
- // Asking is costly: each cell may ask once, and only if it can afford one life-day.
- const candidates=cells.filter(a=>!a.askedForHelp&&day-(a.birthDay??day)+1<val('life'));
- if(!candidates.length)return;
- // Deterministic turn-taking by cell ID; no random selection.
- candidates.sort((a,b)=>a.id-b.id);
- const a=candidates.find(c=>c.id>lastAskingCellId)||candidates[0];
- lastAskingCellId=a.id;
- const hungry=(a.energy??1)<1.5;
- const type=hungry?'energy':sources.length===0?'source':'energy';
- const request=type==='source'?'Создай, пожалуйста, источник энергии рядом со мной.':'Подари мне немного энергии, пожалуйста.';
- a.askedForHelp=true;
- // A plea consumes one full virtual day of the cell's remaining lifespan.
- a.birthDay-=1;
- pendingWish={cellId:a.id,type};
- showWish('💬 Клетка №'+a.id+': «'+request+'» (цена просьбы — 1 год жизни)',true);
-}
-function answerWish(yes){
- if(!pendingWish)return;
- const wish=pendingWish;
- const a=cells.find(c=>c.id===wish.cellId);
- pendingWish=null;
- if(yes&&a){
-  if(wish.type==='source'){
-   sources.push({id:sourceVersion++,x:a.x,y:a.y,power:100,firstId:null,remaining:30});
-   navCache.clear();
-  }else a.energy=clamp((a.energy??1)+1.5,0,5);
- }
- showWish('💬 Клетка №'+wish.cellId+': '+(yes?(a?'«Спасибо за помощь!»':'«Ответ получен слишком поздно…»'):'«Я услышала твой отказ».'));
- lastCellSpeech=day;
-}
-$('grantWish').onclick=()=>answerWish(true);
-$('denyWish').onclick=()=>answerWish(false);
-function step(dt){
- const next=[];
- const orders=huntingOrders();
- for(const a of cells){
-   if(!Number.isFinite(a.heading))a.heading=Math.random()*Math.PI*2;
-   const decision=cellDecision(a,orders);
-   const target=decision.target,route=decision.route,hunt=decision.hunt;
-   const expertise=Math.min(1,(a.distanceTravelled||0)/500);
-   a.known=target?{x:target.x,y:target.y,version:sourceVersion,ttl:999}:null;
-   a.huntingTarget=hunt?.victim.id??null;
-   if(hunt&&cells.includes(hunt.victim)){
-     const orbit=radius(a)+radius(hunt.victim)+5;
-     const tx=hunt.victim.x+Math.cos(hunt.angle)*orbit,ty=hunt.victim.y+Math.sin(hunt.angle)*orbit;
-     const desired=Math.atan2(ty-a.y,tx-a.x);
-     a.heading+=Math.atan2(Math.sin(desired-a.heading),Math.cos(desired-a.heading))*Math.min(1.8,.8*aggression(a));
-     if(Math.hypot(tx-a.x,ty-a.y)<6){a.stuckUntil=Math.max(a.stuckUntil||0,day+.12/aggression(a))}
-   }else if(target&&dist(a,target)>25+target.power*.1){
-     const aim=route&&Math.random()<expertise?route.waypoint:target;
-     const desired=Math.atan2(aim.y-a.y,aim.x-a.x);
-     const diff=Math.atan2(Math.sin(desired-a.heading),Math.cos(desired-a.heading));
-     a.heading+=diff*.38+(Math.random()-.5)*.12;
-   }else if(target){a.heading+=(Math.random()-.5)*1.0}
-   else{a.heading+=(Math.random()-.5)*.55}
-   if((a.x<18&&Math.cos(a.heading)<0)||(a.x>742&&Math.cos(a.heading)>0))a.heading=Math.PI-a.heading;
-   if((a.y<18&&Math.sin(a.heading)<0)||(a.y>502&&Math.sin(a.heading)>0))a.heading=-a.heading;
-   const ox=a.x,oy=a.y,speed=val('movement')*Math.max(1,(a.fedSources||[]).length)*(hunt?aggression(a):1);
-   // Probe forward and turn toward an open route before reaching a wall.
-   const probe=Math.max(13,radius(a)+speed*dt*3);
-   if(blocked(a.x+Math.cos(a.heading)*probe,a.y+Math.sin(a.heading)*probe,radius(a))){
-     const left=a.heading+Math.PI/2,right=a.heading-Math.PI/2;
-     const freeLeft=!blocked(a.x+Math.cos(left)*probe,a.y+Math.sin(left)*probe,radius(a));
-     const freeRight=!blocked(a.x+Math.cos(right)*probe,a.y+Math.sin(right)*probe,radius(a));
-     a.heading=freeLeft&&!freeRight?left:freeRight&&!freeLeft?right:a.heading+((a.id%2)?1:-1)*Math.PI/2;
-   }
-   if(day>=(a.stuckUntil||0))moveWithWalls(a,Math.cos(a.heading)*speed*dt,Math.sin(a.heading)*speed*dt);
-   const travelled=Math.hypot(a.x-ox,a.y-oy);
-   a.distanceTravelled=(a.distanceTravelled||0)+travelled;
-   const moved=travelled>.01;
-   // Age is measured in actual simulation days, not divided by 50.
-   a.age=(a.age||0)+dt*(moved?1+val('aging')/100:1);
-   // Finite energy: exactly one portion per successful feeding event.
-   // A cell can feed again after 0.25 virtual days, even if it remains nearby.
-   let gain=0,feedings=0;
-   if(!a.feedCooldowns)a.feedCooldowns={};
-   for(const s of sources){
-     if(s.power<=0||s.remaining<=0||(a.fedSources||[]).includes(s.id)||dist(a,s)>=25+s.power*.1)continue;
-     if(day<(a.feedCooldowns[s.id]??-1))continue;
-     s.remaining-=1;
-     a.feedCooldowns[s.id]=Infinity; // This source is consumed only once by this cell.
-     feedings++;
-     if(!Array.isArray(a.fedSources))a.fedSources=[];
-     if(!a.fedSources.includes(s.id))a.fedSources.push(s.id);
-     if(s.firstId===null)s.firstId=a.id;
-     gain+=s.power/100*.85*(a.id===s.firstId?1+val('bonus')/100:1);
-   }
-   if(feedings>0){
-     a.fedOnce=true;
-     a.known=null; // Immediately seek a different, unvisited source.
-     // Feeding restores energy, but cannot reset the lifespan clock.
-   }
-   a.energy=clamp((a.energy??1)+gain-(.10+(moved?val('cost')/100:0))*dt/50,0,5);
-   a.progress=(a.progress||0)+feedings*1.4;
-   if(day+dt-(a.birthDay??day)>=val('life')||a.energy<=0){recordDeath(a);continue}
-   if(a.progress>=val('repro')&&a.energy>.8&&cells.length+next.length<500){
-     a.progress-=val('repro');a.energy/=2;
-     const p={x:clamp(a.x+Math.random()*12-6,10,750),y:clamp(a.y+Math.random()*12-6,10,510)};
-     if(blocked(p.x,p.y,10)){p.x=a.x;p.y=a.y}
-     next.push({...a,id:nextId++,age:0,progress:0,generation:(a.generation||1)+1,...p,heading:Math.random()*Math.PI*2,fedOnce:a.fedOnce,fedSources:[...(a.fedSources||[])],feedCooldowns:{},pain:a.pain||0,aggression:a.aggression||0,mind:{visits:0,failedMoves:0,mode:'исследование',lastX:p.x,lastY:p.y},color:a.color,birthDay:day,pushedUntil:0,stuckUntil:0,distanceTravelled:(a.distanceTravelled||0)*.5});born++;
-   }
-   next.push(a);
- }
- cells=next;
- 
- // Exhausted sources disappear and are instantly forgotten by all cells.
- const before=sources.length;
- sources=sources.filter(s=>s.remaining>0);
- if(sources.length!==before){sourceVersion++;navCache.clear();for(const a of cells){a.known=null;a.feedCooldowns=Object.fromEntries(Object.entries(a.feedCooldowns||{}).filter(([id])=>sources.some(s=>String(s.id)===id)))}}
- resolveEncirclements();resolveCellCollisions(dt);day+=dt;
- if(day-lastCellSpeech>=2&&!pendingWish){lastCellSpeech=day;cellSpeech()}
-}
-function frame(t){if(!last)last=t;let elapsed=Math.min(.2,(t-last)/1000);last=t;if(running){acc+=elapsed*val("tempo");while(acc>=.05){step(.05);acc-=.05}}draw();requestAnimationFrame(frame)}
-async function load(){
- running=false;
- try{
-  const r=await fetch('./state.json?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);
-  const s=await r.json();day=s.day||0;cells=s.cells.slice(0,10).map(a=>({...a,known:null,age:a.age||0,fedOnce:false,fedSources:[],feedCooldowns:{},mind:{visits:0,failedMoves:0,mode:'исследование'},color:newColor(),birthDay:day-(a.age||0),pushedUntil:0,stuckUntil:0,distanceTravelled:0}));
- normalizeSpecies();speciesLosses.clear();speciesPain.clear();lastCellSpeech=-Infinity;pendingWish=null;lastAskingCellId=-1;showWish('💬 Клетки пока молчат…');born=s.born||0;dead=0;nextId=s.next_id||101;sources=[];sourceVersion++;navCache.clear();huntTeams.clear();
-  $('updated').textContent='Сохранено: '+new Date(s.updated).toLocaleString('ru-RU');
-  $('mode').textContent='Загружен снимок GitHub. Добавь источники и нажми «Начать локальную симуляцию».';
-  draw();
- }catch(e){$('updated').textContent='Ошибка загрузки: '+e.message}
-}
-$('toggleWalls').onclick=()=>{
- if(wallsEnabled){wallsEnabled=false;walls=[]}
- else{walls=randomWalls();wallsEnabled=true}
- sourceVersion++;navCache.clear();huntTeams.clear();
- $('toggleWalls').textContent=wallsEnabled?'🚧 Убрать стены':'🧱 Поставить стены';
- $('toggleWalls').classList.toggle('off',!wallsEnabled);
- $('toggleWalls').setAttribute('aria-pressed',String(!wallsEnabled));draw();
-};
-function addColony(){
- const n=Math.min(10,Math.max(0,500-cells.length));
- for(let i=0;i<n;i++)cells.push({id:nextId++,...spawnPoint(),age:0,energy:1,progress:0,generation:1,dna:Array.from({length:6},()=>Math.random()-.5),signal:0,known:null,fedOnce:false,fedSources:[],feedCooldowns:{},mind:{visits:0,failedMoves:0,mode:'исследование'},heading:Math.random()*Math.PI*2,color:newColor(),birthDay:day,pushedUntil:0,stuckUntil:0});
- $('detail').textContent='Добавлено '+n+' клеток. Старые клетки сохранены. Всего: '+cells.length+'. Показатели погибших не изменены добавлением.';
- $('mode').textContent='Локальная симуляция идёт; GitHub не изменён.';
- 
- running=true;draw();
-}
-$('restart').onclick=addColony;
-$('inspectMode').onclick=()=>{inspectMode=!inspectMode;$('inspectMode').textContent=inspectMode?'Режим: просмотр клеток':'Режим: добавление источников'};
-$('removeSource').onclick=()=>{sources=[];sourceVersion++;navCache.clear();for(const a of cells)a.known=null;$('detail').textContent='Все источники энергии отключены. Клетки ищут пищу.';draw()};
-$('power').oninput=()=>{$('powerValue').textContent=$('power').value+'%';draw()};$('refresh').onclick=load;$('start').onclick=()=>{running=true;$('mode').textContent='Локальная симуляция идёт в браузере; GitHub не изменяется.'};$('pause').onclick=()=>{running=false;$('mode').textContent='Локальная симуляция на паузе.'};
-c.addEventListener('click',e=>{
- const r=c.getBoundingClientRect(),x=(e.clientX-r.left)*760/r.width,y=(e.clientY-r.top)*520/r.height;
- if(inspectMode){
-   let closest=null,d=16;
-   for(const a of cells){const v=Math.hypot(a.x-x,a.y-y);if(v<d){d=v;closest=a}}
-   $('detail').textContent=closest?JSON.stringify(closest,null,2):'Рядом нет клетки';
- }else{
-   const s={id:sourceVersion++,x,y,power:Number($('power').value),firstId:null,remaining:30};
-   sources.push(s);navCache.clear();
-   $('detail').textContent='Добавлен источник №'+sources.length+' ('+s.power+'%).';
-   draw();
- }
-});
-load();requestAnimationFrame(frame);
+function resize(){const w=sceneEl.clientWidth,h=sceneEl.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+new ResizeObserver(resize).observe(sceneEl);resize();
+function setCamera(){if(follow&&selected&&cells.includes(selected))target.lerp(selected.mesh.position,.08);const ph=clamp(orbit.phi,.12,Math.PI-.12);camera.position.set(target.x+orbit.dist*Math.sin(ph)*Math.cos(orbit.theta),target.y+orbit.dist*Math.cos(ph),target.z+orbit.dist*Math.sin(ph)*Math.sin(orbit.theta));camera.lookAt(target)}
+renderer.domElement.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,moved:false};renderer.domElement.setPointerCapture(e.pointerId)});
+renderer.domElement.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>2)drag.moved=true;orbit.theta-=dx*.007;orbit.phi=clamp(orbit.phi+dy*.007,.12,Math.PI-.12);drag.x=e.clientX;drag.y=e.clientY});
+renderer.domElement.addEventListener('pointerup',e=>{if(!drag)return;const moved=drag.moved;drag=null;if(moved)return;const rect=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);raycaster.setFromCamera(pointer,camera);const hits=raycaster.intersectObjects(cells.map(a=>a.mesh),false);if(hits.length){selected=hits[0].object.userData.cell;updateUI()}});
+renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();orbit.dist=clamp(orbit.dist*Math.exp(e.deltaY*.001),35,650)},{passive:false});
+let pinch=0;renderer.domElement.addEventListener('touchmove',e=>{if(e.touches.length===2){const a=e.touches[0],b=e.touches[1],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(pinch)orbit.dist=clamp(orbit.dist*pinch/d,35,650);pinch=d}},{passive:true});renderer.domElement.addEventListener('touchend',()=>pinch=0);
+function frame(now){requestAnimationFrame(frame);const dt=Math.min(.045,(now-last)/1000);last=now;if(running&&cells.length)tick(dt*.85);if(follow&&(!selected||!cells.includes(selected)))follow=false;setCamera();renderer.render(scene,camera);if(frameN++%16===0)updateUI()}
+reset();requestAnimationFrame(frame);
+})();
 </script></body></html>
