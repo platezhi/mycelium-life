@@ -7,108 +7,105 @@ const $=id=>document.getElementById(id),canvas=$('world'),ctx=canvas.getContext(
 let cell,sources=[],branches=[],nodes=[],particles=[],nextSourceId=0,angle=.7,pitch=.38,zoom=1,drag=null,pointers=new Map(),lastPinch=0,last=performance.now(),uiTimer=0,requestTime=0,prevMood='',lastMessage='',messageIndex=0;
 const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z),randPos=()=>({x:rnd(-75,75),y:rnd(-75,75),z:rnd(-75,75)});
 function say(t){if(t!==lastMessage){$('words').textContent=t;lastMessage=t}}
-function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,mass:1,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10),wander:{x:rnd(-65,65),y:rnd(-65,65),z:rnd(-65,65)},nextWander:0,foodTargetId:null,stretch:0,heading3:{x:1,y:0,z:0}};sources=[];branches=[];nodes=[];particles=Array.from({length:46},(_,i)=>{const t=i*2.399963,rad=Math.sqrt((i+.5)/46)*5.5;return{x:Math.cos(t)*rad,y:Math.sin(t)*rad,z:Math.sin(t*1.7)*rad*.5,vx:0,vy:0,vz:0}});nextSourceId=0;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
+const N=100,GRID=170,spacing=GRID/(N-1),ix=(x,y)=>y*N+x;
+let matter=new Float32Array(N*N),buffer=new Float32Array(N*N),chem=new Float32Array(N*N),chemBuffer=new Float32Array(N*N),totalMatter=0,simClock=0;
+const gridPos=p=>({x:clamp(Math.round((p.x+85)/spacing),1,N-2),y:clamp(Math.round((p.y+85)/spacing),1,N-2)});
+function init(){
+ cell={p:{x:0,y:0,z:0},energy:65,experience:0,found:0,size:1,mass:1,age:0,starve:0,memory:[],wander:{x:rnd(-65,65),y:rnd(-65,65),z:0},nextWander:0};
+ sources=[];nextSourceId=0;matter.fill(0);buffer.fill(0);chem.fill(0);chemBuffer.fill(0);simClock=0;
+ // One compact connected droplet, 10 world units in radius.
+ totalMatter=0;
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+  const wx=x*spacing-85,wy=y*spacing-85,r=Math.hypot(wx,wy);
+  const value=1/(1+Math.exp((r-8.5)*.95));
+  matter[ix(x,y)]=value;totalMatter+=value;
+ }
+ requestTime=0;messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()
+}
+
 function project(p){const x=p.x*Math.cos(angle)-p.z*Math.sin(angle),z=p.x*Math.sin(angle)+p.z*Math.cos(angle),y=p.y*Math.cos(pitch)-z*Math.sin(pitch);const scale=Math.min(w,h)*.00255*zoom;return{x:w/2+x*scale,y:h/2-y*scale,scale}}
 function line(a,b,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
-function draw(){ctx.clearRect(0,0,w,h);const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});const pp=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++){const d=dist(corners[i],corners[j]);if(Math.abs(d-200)<.01)line(pp[i],pp[j],'rgba(130,207,226,.48)',1)}
-for(const source of sources){const s=project(source.p),r=4+Math.sqrt(source.energy)*.65+Math.sin(cell.age*5)*1.2;ctx.shadowColor='#ffe477';ctx.shadowBlur=18;ctx.strokeStyle='#ffdf72';ctx.lineWidth=2;ctx.beginPath();ctx.arc(s.x,s.y,r,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#fff0a5';ctx.beginPath();ctx.arc(s.x,s.y,Math.max(1.5,source.energy/15),0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
-// Density-field plasmodium: a swarm of material parcels forms one shared liquid contour.
-// No nucleus, capsules, stems or fixed round centre are drawn.
-const density=Math.min(1,230/Math.max(w,h)),sw=Math.ceil(w*density),sh=Math.ceil(h*density);
-if(!draw.skin||draw.skin.width!==sw||draw.skin.height!==sh){draw.skin=document.createElement('canvas');draw.skin.width=sw;draw.skin.height=sh;draw.skinCtx=draw.skin.getContext('2d')}
-const img=draw.skinCtx.createImageData(sw,sh),pix=img.data;
-// Deform the whole material distribution along the food direction, not by growing arms.
-// One contiguous radial density silhouette, with multiple broad material lobes.
-// Food sources influence different angles of the SAME body, never independent rods.
-const cp=project(cell.p),cx=cp.x*density,cy=cp.y*density;
-const base=clamp(Math.min(w,h)*.00255*zoom*density*10,3.7,8.5)*Math.sqrt(cell.mass);
-const lobes=(cell.feelers||[]).filter(l=>l.reach>0.01).map(l=>{
- const q=project(l.p),vx=q.x-cp.x,vy=q.y-cp.y,screenDist=Math.hypot(vx,vy)*density;
- return{angle:Math.atan2(vy,vx),length:Math.min(screenDist,screenDist*l.reach/Math.max(1,dist(cell.p,l.p))),weight:l.reach};
-});
-const n=180,radii=new Float32Array(n);
-for(let i=0;i<n;i++){
- const theta=i*Math.PI*2/n;let extension=0;
- for(const l of lobes){const delta=Math.atan2(Math.sin(theta-l.angle),Math.cos(theta-l.angle));
-  // Narrow smooth sectors allow long visible extensions while remaining joined at the base.
-  extension=Math.max(extension,l.length*Math.exp(-delta*delta/(2*.32*.32)));
+function draw(){
+ ctx.clearRect(0,0,w,h);
+ const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});
+ const pp=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++)if(Math.abs(dist(corners[i],corners[j])-200)<.01)line(pp[i],pp[j],'rgba(130,207,226,.48)',1);
+ for(const source of sources){const s=project(source.p),r=4+Math.sqrt(source.energy)*.65;
+  ctx.shadowColor='#ffe477';ctx.shadowBlur=16;ctx.strokeStyle='#ffdf72';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(s.x,s.y,r,0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0;
  }
- const ripple=base*(.06*Math.sin(theta*5+cell.age*.7)+.035*Math.sin(theta*8-cell.age*.43));
- radii[i]=Math.max(base*.6,base*.75+extension+ripple);
+ // Draw the continuous material density on the rotated world plane, not radial lobes or limbs.
+ // Smooth contours emerge from local transport and surface tension.
+ const threshold=.33;
+ ctx.save();ctx.globalAlpha=.93;
+ for(let y=1;y<N-2;y++)for(let x=1;x<N-2;x++){
+  const i=ix(x,y),v=matter[i];if(v<threshold)continue;
+  const p=project({x:x*spacing-85,y:y*spacing-85,z:0});
+  const px=project({x:(x+1)*spacing-85,y:y*spacing-85,z:0});
+  const py=project({x:x*spacing-85,y:(y+1)*spacing-85,z:0});
+  const gx=matter[i+1]-matter[i-1],gy=matter[i+N]-matter[i-N];
+  const light=clamp(.76-gx*.7+gy*.8,0,1);
+  const opacity=clamp((v-threshold)*3.8,0,1);
+  ctx.fillStyle='rgba('+Math.round(125+100*light)+','+Math.round(175+73*light)+','+Math.round(184+68*light)+','+opacity+')';
+  ctx.beginPath();ctx.moveTo(p.x,p.y);
+  ctx.lineTo(px.x,px.y);ctx.lineTo(px.x+py.x-p.x,px.y+py.y-p.y);ctx.lineTo(py.x,py.y);ctx.closePath();ctx.fill();
+ }
+ ctx.restore();
 }
-for(let y=1;y<sh-1;y++)for(let x=1;x<sw-1;x++){
- const dx=x+.5-cx,dy=y+.5-cy,theta=(Math.atan2(dy,dx)+2*Math.PI)%(2*Math.PI);
- const t=theta*n/(2*Math.PI),i=Math.floor(t)%n,f=t-Math.floor(t);
- const boundary=radii[i]*(1-f)+radii[(i+1)%n]*f;
- const d=Math.hypot(dx,dy)-boundary,alpha=clamp(.5-d/1.25,0,1);
- if(alpha<=0)continue;
- const u=dx/Math.max(1,boundary),v=dy/Math.max(1,boundary),light=clamp(.68-.21*u-.24*v,0,1);
- const gloss=Math.pow(Math.max(0,1-Math.hypot(u+.36,v+.38)),5);
- const o=(y*sw+x)*4;pix[o]=Math.min(255,90+128*light+24*gloss);pix[o+1]=Math.min(255,146+100*light+20*gloss);pix[o+2]=Math.min(255,151+97*light+23*gloss);pix[o+3]=Math.round(alpha*245*(.45+.55*clamp(cell.energy/65,0,1)));
-}
-draw.skinCtx.putImageData(img,0,0);ctx.save();ctx.imageSmoothingEnabled=true;ctx.shadowColor='#78e9ce';ctx.shadowBlur=7;ctx.drawImage(draw.skin,0,0,w,h);ctx.restore();
 
-}
 function chooseRequest(){const n=cell.experience;if(n<1)return ['Энергия?..','Здесь пусто. Можно немного энергии?','Я всё ещё ищу…'][messageIndex++%3];if(n<3)return ['Я помню, где нашла первый источник. Покажи мне ещё один?','Я научилась двигаться к светящейся энергии. Можно попробовать снова?','Мне трудно двигаться без энергии. Поможешь?'][messageIndex++%3];if(n<6)return ['Я стала длиннее и лучше выбираю направление. Дай мне новый источник — хочу проверить свой путь.','Я уже помню '+cell.found+' источника. Мне нужна энергия, чтобы продолжить исследование.','Каждый новый источник меняет мою форму. Мне хочется узнать, какой я стану дальше.'][messageIndex++%3];return ['Я исследовала '+cell.found+' источников и научилась точнее поворачивать. Мне не хватает энергии для следующего открытия.','Я сохранила свои маршруты и опыт. Создай новый источник, и я попробую добраться до него ещё эффективнее.','Я стала сложнее, но мир вокруг по-прежнему огромен. Поможешь мне продолжить путешествие?'][messageIndex++%3]}
 function step(dt){
- cell.age+=dt;cell.energy=Math.max(0,cell.energy-dt*(sources.length?.25:cell.energy>15?1.5:.7));cell.starve=clamp((30-cell.energy)/30,0,1);
- if(cell.age>=cell.nextWander||dist(cell.p,cell.wander)<9){cell.wander=randPos();cell.nextWander=cell.age+rnd(18,30)}
- // Every source develops an independent zone of deformation of the SAME connected body.
- if(!cell.feelers)cell.feelers=[];
- for(const source of sources){
-  let l=cell.feelers.find(v=>v.id===source.id);
-  if(!l){l={id:source.id,p:source.p,reach:0};cell.feelers.push(l)}
-  l.p=source.p;
-  l.reach=Math.min(dist(cell.p,source.p),l.reach+dt*9);
+ cell.age+=dt;cell.energy=Math.max(0,cell.energy-dt*(sources.length?.22:cell.energy>15?1.1:.5));cell.starve=clamp((30-cell.energy)/30,0,1);
+ if(cell.age>=cell.nextWander){cell.wander={x:rnd(-65,65),y:rnd(-65,65),z:0};cell.nextWander=cell.age+rnd(15,25)}
+ // Two-dimensional nutrient concentration field, diffused independently from all sources.
+ chemBuffer.fill(0);
+ for(const s of sources){const p=gridPos(s.p);chemBuffer[ix(p.x,p.y)]=Math.min(5,chemBuffer[ix(p.x,p.y)]+4)}
+ if(!sources.length){const p=gridPos(cell.wander);chemBuffer[ix(p.x,p.y)]=.3}
+ for(let y=1;y<N-1;y++)for(let x=1;x<N-1;x++){
+  const i=ix(x,y),v=chem[i];
+  chemBuffer[i]+=Math.max(0,v+dt*8*(chem[i-1]+chem[i+1]+chem[i-N]+chem[i+N]-4*v)-dt*.24*v);
  }
- for(const l of cell.feelers)if(!sources.some(s=>s.id===l.id))l.reach=Math.max(0,l.reach-dt*12);
- cell.feelers=cell.feelers.filter(l=>l.reach>.01||sources.some(s=>s.id===l.id));
- // Drift slowly toward the weighted centre, not serially between food sources.
- let tx=0,ty=0,tz=0,tw=0;
- for(const source of sources){const weight=1/(18+dist(cell.p,source.p));tx+=source.p.x*weight;ty+=source.p.y*weight;tz+=source.p.z*weight;tw+=weight}
- const target=tw?{x:tx/tw,y:ty/tw,z:tz/tw}:cell.wander;
- const dx=target.x-cell.p.x,dy=target.y-cell.p.y,dz=target.z-cell.p.z,d=Math.hypot(dx,dy,dz)||1;
- const speed=(sources.length?2.3:1.6)*(1-.45*cell.starve);
- const travel={x:dx/d*speed*dt,y:dy/d*speed*dt,z:dz/d*speed*dt};
- cell.p.x=clamp(cell.p.x+travel.x,-83,83);cell.p.y=clamp(cell.p.y+travel.y,-83,83);cell.p.z=clamp(cell.p.z+travel.z,-83,83);
- // All parcels travel together, with low-frequency internal flow and local cohesion.
- // No parcel is assigned to a source and none can shoot ahead of the body.
- const count=particles.length,forces=particles.map(()=>({x:0,y:0,z:0}));
- for(let i=0;i<count;i++){
-  const p=particles[i];p.x+=travel.x;p.y+=travel.y;p.z+=travel.z;
-  for(let j=i+1;j<count;j++){
-   const q=particles[j],x=q.x-p.x,y=q.y-p.y,z=q.z-p.z,r=Math.hypot(x,y,z)||.001;
-   if(r<15){const push=(r-8)*.035;forces[i].x+=x/r*push;forces[i].y+=y/r*push;forces[i].z+=z/r*push;forces[j].x-=x/r*push;forces[j].y-=y/r*push;forces[j].z-=z/r*push}
+ [chem,chemBuffer]=[chemBuffer,chem];
+ // Conservative neighbor-to-neighbor material transport: no teleportation or detached arms.
+ // Surface tension smooths the perimeter; nutrient gradients bias local flow.
+ buffer.set(matter);
+ const flow=dt*1.1;
+ for(let y=2;y<N-2;y++)for(let x=2;x<N-2;x++){
+  const i=ix(x,y);
+  for(const j of [i+1,i+N]){
+   const a=matter[i],b=matter[j];
+   const chemDrive=(chem[j]-chem[i])*.9;
+   const spread=(a-b)*.12;
+   const flux=clamp(flow*(spread+chemDrive*Math.min(a,b+.12)), -b*.16,a*.16);
+   buffer[i]-=flux;buffer[j]+=flux;
   }
  }
- for(let i=0;i<count;i++){
-  const p=particles[i],phase=i*2.399963,fx=forces[i].x,fy=forces[i].y,fz=forces[i].z;
-  // Weak attraction to the organism's moving centre prevents detached limbs.
-  const ax=fx+(cell.p.x-p.x)*.10+Math.sin(cell.age*.72+phase)*.16;
-  const ay=fy+(cell.p.y-p.y)*.10+Math.cos(cell.age*.63+phase*1.3)*.16;
-  const az=fz+(cell.p.z-p.z)*.10+Math.sin(cell.age*.57+phase*.7)*.12;
-  p.vx=(p.vx+ax*dt)*Math.exp(-2.2*dt);p.vy=(p.vy+ay*dt)*Math.exp(-2.2*dt);p.vz=(p.vz+az*dt)*Math.exp(-2.2*dt);
-  p.x=clamp(p.x+p.vx*dt,-94,94);p.y=clamp(p.y+p.vy*dt,-94,94);p.z=clamp(p.z+p.vz*dt,-94,94);
-  const rx=p.x-cell.p.x,ry=p.y-cell.p.y,rz=p.z-cell.p.z,rr=Math.hypot(rx,ry,rz),maxR=7.2*Math.sqrt(cell.mass);
-  if(rr>maxR){const k=maxR/rr;p.x=cell.p.x+rx*k;p.y=cell.p.y+ry*k;p.z=cell.p.z+rz*k;p.vx*=.4;p.vy*=.4;p.vz*=.4}
+ // A weak rhythmic contractile wave creates ongoing cytoplasmic streaming.
+ for(let y=2;y<N-2;y++)for(let x=2;x<N-2;x++){
+  const i=ix(x,y),v=matter[i],lap=matter[i-1]+matter[i+1]+matter[i-N]+matter[i+N]-4*v;
+  buffer[i]+=dt*.08*lap;
  }
- // All contacted sources are absorbed in parallel, not one target at a time.
- let finished=0;
- for(const source of [...sources]){
-  const l=cell.feelers.find(v=>v.id===source.id);
-  if(!l||l.reach+8<dist(cell.p,source.p))continue;
-  const consumed=Math.min(source.energy,dt*5);
-  source.energy-=consumed;cell.energy=clamp(cell.energy+consumed,0,100);
-  if(source.energy<=.001){
-   sources.splice(sources.indexOf(source),1);cell.found++;cell.experience++;
-   cell.memory.push({...source.p});cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);finished++;
+ // Keep total mass conserved during locomotion; food adds only a small amount.
+ let sum=0;for(let i=0;i<buffer.length;i++){buffer[i]=Math.max(0,buffer[i]);sum+=buffer[i]}
+ const correction=totalMatter/Math.max(.00001,sum);
+ for(let i=0;i<buffer.length;i++)buffer[i]*=correction;
+ [matter,buffer]=[buffer,matter];
+ let eaten=0;
+ for(const s of [...sources]){
+  const p=gridPos(s.p),v=matter[ix(p.x,p.y)];
+  if(v<.27)continue;
+  const amount=Math.min(s.energy,dt*5);s.energy-=amount;cell.energy=clamp(cell.energy+amount,0,100);
+  if(s.energy<=.001){
+   sources.splice(sources.indexOf(s),1);cell.found++;cell.experience++;cell.memory.push({...s.p});
+   cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);
+   const extra=totalMatter*.035;totalMatter+=extra;matter[ix(p.x,p.y)]+=extra;
+   eaten++;
   }
  }
- if(finished){requestTime=cell.age+7;say(finished>1?'Я поглотила несколько источников одновременно.':'Я поглотила энергию и продолжаю искать пищу.')}
+ if(eaten){requestTime=cell.age+7;say(eaten>1?'Я поглотила несколько источников одновременно.':'Я поглотила энергию и продолжаю исследовать пространство.')}
  if(!sources.length&&cell.energy<34&&cell.age>requestTime){say(chooseRequest());requestTime=cell.age+clamp(13-cell.experience*.5,6,13)}
 }
 function updateUI(){$('level').textContent=cell.experience;$('found').textContent=cell.found;$('reserve').textContent=Math.round(cell.energy)+'%';$('bar').style.width=cell.energy+'%';$('size').textContent=cell.size.toFixed(1)+'×';$('age').textContent=Math.floor(cell.age);$('available').textContent=sources.length;const mood=sources.length?'идёт к энергии':cell.energy<12?'сильно ослабла':cell.energy<34?'голодает':'исследует';$('mood').textContent=mood}
-$('energy').onclick=()=>{const s={id:++nextSourceId,p:randPos(),energy:36};sources.push(s);say(sources.length>1?'Я чувствую '+sources.length+' источников. Медленно направляюсь к ближайшему всем телом.':cell.energy<20?'Ты меня услышал! Тянусь к энергии.':'Медленно перемещаюсь к источнику всем телом.');requestTime=cell.age+9;updateUI()};
+$('energy').onclick=()=>{const s={id:++nextSourceId,p:{x:rnd(-70,70),y:rnd(-70,70),z:0},energy:36};sources.push(s);say(sources.length>1?'Я чувствую '+sources.length+' источников. Чувствую все источники и перераспределяю вещество.':cell.energy<20?'Ты меня услышал! Тянусь к энергии.':'Медленно перемещаюсь к источнику всем телом.');requestTime=cell.age+9;updateUI()};
 $('reset').onclick=init;
 $('talk').addEventListener('submit',e=>{e.preventDefault();const field=$('question'),question=field.value.trim();if(!question)return;field.value='';const q=question.toLowerCase();let answer;
  if(/привет|здравствуй|как тебя зовут|кто ты/.test(q))answer=cell.experience<2?'Привет! Я пока маленькая клетка. Я учусь искать энергию.':'Привет! Я выросла после '+cell.found+' источников. Хочешь узнать, что я запомнила?';
