@@ -21,24 +21,21 @@ const img=draw.skinCtx.createImageData(sw,sh),pix=img.data;
 // One contiguous radial density silhouette, with multiple broad material lobes.
 // Food sources influence different angles of the SAME body, never independent rods.
 const cp=project(cell.p),cx=cp.x*density,cy=cp.y*density;
-const base=clamp(Math.min(w,h)*.00255*zoom*density*12,4.5,10.5)*Math.sqrt(cell.mass);
-const lobes=sources.map(s=>{const q=project(s.p);const dx=q.x-cp.x,dy=q.y-cp.y;
- return{id:s.id,angle:Math.atan2(dy,dx),distance:dist(cell.p,s.p),screenDistance:Math.hypot(dx,dy)*density,depth:Math.abs(s.p.z-cell.p.z)}});
+const base=clamp(Math.min(w,h)*.00255*zoom*density*10,3.7,8.5)*Math.sqrt(cell.mass);
+const lobes=(cell.feelers||[]).filter(l=>l.reach>0.01).map(l=>{
+ const q=project(l.p),vx=q.x-cp.x,vy=q.y-cp.y,screenDist=Math.hypot(vx,vy)*density;
+ return{angle:Math.atan2(vy,vx),length:Math.min(screenDist,screenDist*l.reach/Math.max(1,dist(cell.p,l.p))),weight:l.reach};
+});
 const n=180,radii=new Float32Array(n);
-let avg=0;
 for(let i=0;i<n;i++){
  const theta=i*Math.PI*2/n;let extension=0;
- for(const l of lobes){const diff=Math.atan2(Math.sin(theta-l.angle),Math.cos(theta-l.angle));
-  const reach=clamp(l.screenDistance/base,0,4.4);
-  const response=clamp((1.2+reach)*.7,0,2.6);
-  extension+=response*Math.exp(-diff*diff/(2*.52*.52));
+ for(const l of lobes){const delta=Math.atan2(Math.sin(theta-l.angle),Math.cos(theta-l.angle));
+  // Narrow smooth sectors allow long visible extensions while remaining joined at the base.
+  extension=Math.max(extension,l.length*Math.exp(-delta*delta/(2*.32*.32)));
  }
- const ripple=.055*Math.sin(theta*5+cell.age*.6)+.035*Math.sin(theta*8-cell.age*.4);
- radii[i]=Math.max(.78,1+extension+ripple);
- avg+=radii[i]*radii[i]/n;
+ const ripple=base*(.06*Math.sin(theta*5+cell.age*.7)+.035*Math.sin(theta*8-cell.age*.43));
+ radii[i]=Math.max(base*.6,base*.75+extension+ripple);
 }
-// Keep approximately the same amount of material while retaining visible lobes.
-const normalizer=1/Math.sqrt(Math.max(1,avg))*.94+.06;
 for(let y=1;y<sh-1;y++)for(let x=1;x<sw-1;x++){
  const dx=x+.5-cx,dy=y+.5-cy,theta=(Math.atan2(dy,dx)+2*Math.PI)%(2*Math.PI);
  const t=theta*n/(2*Math.PI),i=Math.floor(t)%n,f=t-Math.floor(t);
@@ -56,21 +53,22 @@ function chooseRequest(){const n=cell.experience;if(n<1)return ['Энергия?
 function step(dt){
  cell.age+=dt;cell.energy=Math.max(0,cell.energy-dt*(sources.length?.25:cell.energy>15?1.5:.7));cell.starve=clamp((30-cell.energy)/30,0,1);
  if(cell.age>=cell.nextWander||dist(cell.p,cell.wander)<9){cell.wander=randPos();cell.nextWander=cell.age+rnd(18,30)}
- // One destination for the WHOLE organism, never individual parcel-to-food tentacles.
- const active=sources.find(s=>s.id===cell.foodTargetId);
- const chosen=active|| (sources.length?sources.reduce((a,b)=>dist(cell.p,a.p)<dist(cell.p,b.p)?a:b):null);
- cell.foodTargetId=chosen?chosen.id:null;
- const target=chosen?chosen.p:cell.wander;
+ // Every source develops an independent zone of deformation of the SAME connected body.
+ if(!cell.feelers)cell.feelers=[];
+ for(const source of sources){
+  let l=cell.feelers.find(v=>v.id===source.id);
+  if(!l){l={id:source.id,p:source.p,reach:0};cell.feelers.push(l)}
+  l.p=source.p;
+  l.reach=Math.min(dist(cell.p,source.p),l.reach+dt*9);
+ }
+ for(const l of cell.feelers)if(!sources.some(s=>s.id===l.id))l.reach=Math.max(0,l.reach-dt*12);
+ cell.feelers=cell.feelers.filter(l=>l.reach>.01||sources.some(s=>s.id===l.id));
+ // Drift slowly toward the weighted centre, not serially between food sources.
+ let tx=0,ty=0,tz=0,tw=0;
+ for(const source of sources){const weight=1/(18+dist(cell.p,source.p));tx+=source.p.x*weight;ty+=source.p.y*weight;tz+=source.p.z*weight;tw+=weight}
+ const target=tw?{x:tx/tw,y:ty/tw,z:tz/tw}:cell.wander;
  const dx=target.x-cell.p.x,dy=target.y-cell.p.y,dz=target.z-cell.p.z,d=Math.hypot(dx,dy,dz)||1;
- // Persistent food target prevents oscillation; visible full-body stretching is independent of translation.
-const desired=chosen?Math.min(1,dist(cell.p,chosen.p)/35):.08;
-cell.stretch+=(desired-cell.stretch)*Math.min(1,dt*.55);
-cell.heading3.x+=(dx/d-cell.heading3.x)*Math.min(1,dt*.9);
-cell.heading3.y+=(dy/d-cell.heading3.y)*Math.min(1,dt*.9);
-cell.heading3.z+=(dz/d-cell.heading3.z)*Math.min(1,dt*.9);
-const hm=Math.hypot(cell.heading3.x,cell.heading3.y,cell.heading3.z)||1;
-cell.heading3.x/=hm;cell.heading3.y/=hm;cell.heading3.z/=hm;
-const speed=(chosen?4.3:1.8)*(1-.45*cell.starve);
+ const speed=(sources.length?2.3:1.6)*(1-.45*cell.starve);
  const travel={x:dx/d*speed*dt,y:dy/d*speed*dt,z:dz/d*speed*dt};
  cell.p.x=clamp(cell.p.x+travel.x,-83,83);cell.p.y=clamp(cell.p.y+travel.y,-83,83);cell.p.z=clamp(cell.p.z+travel.z,-83,83);
  // All parcels travel together, with low-frequency internal flow and local cohesion.
@@ -94,17 +92,19 @@ const speed=(chosen?4.3:1.8)*(1-.45*cell.starve);
   const rx=p.x-cell.p.x,ry=p.y-cell.p.y,rz=p.z-cell.p.z,rr=Math.hypot(rx,ry,rz),maxR=7.2*Math.sqrt(cell.mass);
   if(rr>maxR){const k=maxR/rr;p.x=cell.p.x+rx*k;p.y=cell.p.y+ry*k;p.z=cell.p.z+rz*k;p.vx*=.4;p.vy*=.4;p.vz*=.4}
  }
- // Only physical proximity of the cohesive organism permits absorption.
+ // All contacted sources are absorbed in parallel, not one target at a time.
+ let finished=0;
  for(const source of [...sources]){
-  // Multiple food contacts are processed independently on every frame.
-  const q=project(source.p),c=project(cell.p),sx=q.x-c.x,sy=q.y-c.y,screenDistance=Math.hypot(sx,sy);
-  const nearby=sources.filter(v=>dist(cell.p,v.p)<100);
-  const visibleReach=12*Math.sqrt(cell.mass)*(1+Math.min(2.2,nearby.length*.55));
-  const touching=screenDistance<visibleReach*1.7 && dist(cell.p,source.p)<Math.max(19,visibleReach*1.8);
-  if(touching){const consumed=Math.min(source.energy,dt*5);source.energy-=consumed;cell.energy=clamp(cell.energy+consumed,0,100);
-   if(source.energy<=.001){sources.splice(sources.indexOf(source),1);if(cell.foodTargetId===source.id)cell.foodTargetId=null;cell.found++;cell.experience++;cell.memory.push({...source.p});cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);requestTime=cell.age+7;say('Я поглотила энергию, немного пополнела и продолжаю медленно исследовать мир.')}
+  const l=cell.feelers.find(v=>v.id===source.id);
+  if(!l||l.reach+8<dist(cell.p,source.p))continue;
+  const consumed=Math.min(source.energy,dt*5);
+  source.energy-=consumed;cell.energy=clamp(cell.energy+consumed,0,100);
+  if(source.energy<=.001){
+   sources.splice(sources.indexOf(source),1);cell.found++;cell.experience++;
+   cell.memory.push({...source.p});cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);finished++;
   }
  }
+ if(finished){requestTime=cell.age+7;say(finished>1?'Я поглотила несколько источников одновременно.':'Я поглотила энергию и продолжаю искать пищу.')}
  if(!sources.length&&cell.energy<34&&cell.age>requestTime){say(chooseRequest());requestTime=cell.age+clamp(13-cell.experience*.5,6,13)}
 }
 function updateUI(){$('level').textContent=cell.experience;$('found').textContent=cell.found;$('reserve').textContent=Math.round(cell.energy)+'%';$('bar').style.width=cell.energy+'%';$('size').textContent=cell.size.toFixed(1)+'×';$('age').textContent=Math.floor(cell.age);$('available').textContent=sources.length;const mood=sources.length?'идёт к энергии':cell.energy<12?'сильно ослабла':cell.energy<34?'голодает':'исследует';$('mood').textContent=mood}
