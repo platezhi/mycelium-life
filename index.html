@@ -75,6 +75,7 @@ function experiencedRoute(a){
  let chosen=null,best=Infinity;
  const x=clamp(Math.floor(a.x/NAV),0,NX-1),y=clamp(Math.floor(a.y/NAV),0,NY-1),idx=y*NX+x;
  for(const s of sources){
+  if((a.fedSources||[]).includes(s.id)||s.remaining<=0||s.power<=0)continue;
   const field=navField(s),d=field.distances[idx];
   if(d<best){best=d;chosen={s,field}}
  }
@@ -270,7 +271,7 @@ function cellDecision(a,orders){
  const route=(a.distanceTravelled||0)>40?experiencedRoute(a):null;
  let target=null,score=-Infinity;
  for(const s of sources){
-  if(s.remaining<=0)continue;
+  if(s.remaining<=0||s.power<=0||(a.fedSources||[]).includes(s.id))continue;
   const distance=route&&route.source.id===s.id?dist(a,route.waypoint):dist(a,s);
   const nearby=cells.filter(b=>b.id!==a.id&&dist(b,s)<65).length;
   const value=s.remaining*.045+s.power*.005-distance*.012-nearby*(scarcity?.4:.15);
@@ -374,10 +375,10 @@ function step(dt){
    let gain=0,feedings=0;
    if(!a.feedCooldowns)a.feedCooldowns={};
    for(const s of sources){
-     if(s.power<=0||s.remaining<=0||dist(a,s)>=25+s.power*.1)continue;
+     if(s.power<=0||s.remaining<=0||(a.fedSources||[]).includes(s.id)||dist(a,s)>=25+s.power*.1)continue;
      if(day<(a.feedCooldowns[s.id]??-1))continue;
      s.remaining-=1;
-     a.feedCooldowns[s.id]=day+.25;
+     a.feedCooldowns[s.id]=Infinity; // This source is consumed only once by this cell.
      feedings++;
      if(!Array.isArray(a.fedSources))a.fedSources=[];
      if(!a.fedSources.includes(s.id))a.fedSources.push(s.id);
@@ -386,6 +387,7 @@ function step(dt){
    }
    if(feedings>0){
      a.fedOnce=true;
+     a.known=null; // Immediately seek a different, unvisited source.
      // Feeding restores energy, but cannot reset the lifespan clock.
    }
    a.energy=clamp((a.energy??1)+gain-(.10+(moved?val('cost')/100:0))*dt/50,0,5);
