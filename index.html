@@ -12,29 +12,47 @@ function project(p){const x=p.x*Math.cos(angle)-p.z*Math.sin(angle),z=p.x*Math.s
 function line(a,b,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
 function draw(){ctx.clearRect(0,0,w,h);const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});const pp=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++){const d=dist(corners[i],corners[j]);if(Math.abs(d-200)<.01)line(pp[i],pp[j],'rgba(130,207,226,.48)',1)}
 for(const source of sources){const s=project(source.p),r=4+Math.sqrt(source.energy)*.65+Math.sin(cell.age*5)*1.2;ctx.shadowColor='#ffe477';ctx.shadowBlur=18;ctx.strokeStyle='#ffdf72';ctx.lineWidth=2;ctx.beginPath();ctx.arc(s.x,s.y,r,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#fff0a5';ctx.beginPath();ctx.arc(s.x,s.y,Math.max(1.5,source.energy/15),0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
-// One continuous deformable body: its silhouette grows from a circle into an oval,
-// then into a smooth irregular shape spanning every reached or growing target.
-const bodyPoints=[project(cell.p),...branches.map(branch=>project(branch.tip))];
-const radius=(9+cell.size*2.8)*zoom;
-const samples=[];
-for(const p of bodyPoints){for(let i=0;i<20;i++){const t=i*Math.PI/10;samples.push({x:p.x+radius*Math.cos(t),y:p.y+radius*Math.sin(t)})}}
-samples.sort((a,b)=>a.x-b.x||a.y-b.y);
-const cross=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
-const lower=[],upper=[];
-for(const p of samples){while(lower.length>1&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop();lower.push(p)}
-for(let i=samples.length-1;i>=0;i--){const p=samples[i];while(upper.length>1&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop();upper.push(p)}
-lower.pop();upper.pop();const hull=lower.concat(upper);
-if(hull.length>2){
- const hunger=clamp(cell.energy/65,0,1);
- const center=hull.reduce((a,p)=>({x:a.x+p.x/hull.length,y:a.y+p.y/hull.length}),{x:0,y:0});
- const g=ctx.createRadialGradient(center.x-radius*.2,center.y-radius*.25,2,center.x,center.y,Math.max(radius*2,Math.max(...hull.map(p=>Math.hypot(p.x-center.x,p.y-center.y)))));
- g.addColorStop(0,'#d6fff0');g.addColorStop(.45,'#78e6c6');g.addColorStop(1,'#238b91');
- ctx.globalAlpha=.32+.68*hunger;ctx.fillStyle=g;ctx.strokeStyle='#b5f9e2';ctx.lineWidth=1.8;ctx.shadowColor='#6de8ca';ctx.shadowBlur=16;
- ctx.beginPath();
- for(let i=0;i<hull.length;i++){const p=hull[i],n=hull[(i+1)%hull.length],mid={x:(p.x+n.x)/2,y:(p.y+n.y)/2};if(i===0)ctx.moveTo(mid.x,mid.y);ctx.quadraticCurveTo(n.x,n.y,(n.x+hull[(i+2)%hull.length].x)/2,(n.y+hull[(i+2)%hull.length].y)/2)}
- ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.stroke();
- ctx.globalAlpha=.8;const nucleus=project(cell.p);ctx.fillStyle='#23626a';ctx.beginPath();ctx.arc(nucleus.x,nucleus.y,Math.max(2,radius*.22),0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+// Render the organism as a continuous, glossy soft body, never as strokes.
+// Smooth-union signed distance fields fuse broad capsules and rounded tips.
+const radius=(13+cell.size*2.8)*zoom;
+const segments=branches.map(b=>({a:project(b.origin),b:project(b.tip),id:b.id}));
+const root=project(cell.p);
+const density=Math.min(1,310/Math.max(w,h)),sw=Math.max(1,Math.ceil(w*density)),sh=Math.max(1,Math.ceil(h*density));
+if(!draw.skin||draw.skin.width!==sw||draw.skin.height!==sh){draw.skin=document.createElement('canvas');draw.skin.width=sw;draw.skin.height=sh;draw.skinCtx=draw.skin.getContext('2d')}
+const image=draw.skinCtx.createImageData(sw,sh),pixels=image.data;
+const r=radius*density,softness=Math.max(4,r*.85),fade=clamp(cell.energy/65,0,1);
+const pieces=segments.map(s=>({ax:s.a.x*density,ay:s.a.y*density,bx:s.b.x*density,by:s.b.y*density,id:s.id}));
+const rootX=root.x*density,rootY=root.y*density;
+function merge(a,b,k){const t=Math.max(k-Math.abs(a-b),0)/k;return Math.min(a,b)-t*t*k*.25}
+function field(x,y){
+ let d=Math.hypot(x-rootX,y-rootY)-r*1.1;
+ for(const s of pieces){
+  const vx=s.bx-s.ax,vy=s.by-s.ay,len2=vx*vx+vy*vy;
+  const t=len2?clamp(((x-s.ax)*vx+(y-s.ay)*vy)/len2,0,1):0;
+  const px=s.ax+t*vx,py=s.ay+t*vy;
+  const thickness=r*(.94+.16*Math.sin(t*6.28+s.id*.7+cell.age*.4));
+  const v=Math.hypot(x-px,y-py)-thickness;
+  d=merge(d,v,softness);
+ }
+ return d;
 }
+for(let y=0;y<sh;y++)for(let x=0;x<sw;x++){
+ const d=field(x+.5,y+.5),alpha=clamp(.5-d/1.5,0,1);
+ if(alpha<=0)continue;
+ const gx=field(x+1.5,y+.5)-field(x-.5,y+.5);
+ const gy=field(x+.5,y+1.5)-field(x+.5,y-.5);
+ const light=clamp(.64-.22*gx-.29*gy,0,1);
+ const gloss=Math.pow(Math.max(0,1-Math.hypot(gx+.45,gy+.65)*.65),4);
+ const deep=clamp(-d/(r*1.4),0,1);
+ const i=(y*sw+x)*4;
+ pixels[i]=Math.round(70+130*light+35*gloss+20*deep);
+ pixels[i+1]=Math.round(132+94*light+25*gloss+8*deep);
+ pixels[i+2]=Math.round(141+83*light+23*gloss+12*deep);
+ pixels[i+3]=Math.round(alpha*(85+170*fade));
+}
+draw.skinCtx.putImageData(image,0,0);
+ctx.save();ctx.imageSmoothingEnabled=true;ctx.shadowColor='#73d8d0';ctx.shadowBlur=12;ctx.drawImage(draw.skin,0,0,w,h);ctx.restore();
+
 }
 function chooseRequest(){const n=cell.experience;if(n<1)return ['Энергия?..','Здесь пусто. Можно немного энергии?','Я всё ещё ищу…'][messageIndex++%3];if(n<3)return ['Я помню, где нашла первый источник. Покажи мне ещё один?','Я научилась двигаться к светящейся энергии. Можно попробовать снова?','Мне трудно двигаться без энергии. Поможешь?'][messageIndex++%3];if(n<6)return ['Я стала длиннее и лучше выбираю направление. Дай мне новый источник — хочу проверить свой путь.','Я уже помню '+cell.found+' источника. Мне нужна энергия, чтобы продолжить исследование.','Каждый новый источник меняет мою форму. Мне хочется узнать, какой я стану дальше.'][messageIndex++%3];return ['Я исследовала '+cell.found+' источников и научилась точнее поворачивать. Мне не хватает энергии для следующего открытия.','Я сохранила свои маршруты и опыт. Создай новый источник, и я попробую добраться до него ещё эффективнее.','Я стала сложнее, но мир вокруг по-прежнему огромен. Поможешь мне продолжить путешествие?'][messageIndex++%3]}
 function step(dt){
