@@ -1,115 +1,36 @@
-<!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mycelium Life 4.0 — сетевой разум</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#07151e;color:#e5f3f4;font:14px system-ui}main{max-width:1050px;margin:auto;padding:12px}h1{font-size:23px;margin:8px 0}p{color:#b3cbd0;line-height:1.5}button{background:#1c6672;border:1px solid #418c96;border-radius:9px;color:white;padding:10px 9px;font-weight:600;cursor:pointer}.toolbar{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.toolbar button{flex:1;min-width:125px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.stat,.panel{background:#142d39;border-radius:10px;padding:11px}.stat strong{display:block;font-size:20px}.scene{position:relative;border:1px solid #37677a;border-radius:13px;height:min(62vh,620px);min-height:350px;overflow:hidden;background:radial-gradient(ellipse,#103746,#07141e)}#world{width:100%;height:100%;display:block;touch-action:none}.hint{position:absolute;bottom:7px;left:9px;font-size:11px;color:#a4c8d2;pointer-events:none}.columns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.species{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center;border-bottom:1px solid #31515c;padding:7px 0}.swatch{width:11px;height:11px;border-radius:50%}.muted{color:#adc8ce;font-size:12px}.log{max-height:180px;overflow:auto}.log div{padding:4px 0;border-bottom:1px solid #274854}.legend{display:flex;gap:14px;flex-wrap:wrap;color:#aacbd2;margin:9px 0;font-size:12px}@media(max-width:650px){.stats{grid-template-columns:repeat(2,1fr)}.columns{grid-template-columns:1fr}.scene{height:54vh}.toolbar button{min-width:110px}}
-</style></head><body><main>
-<h1>🌱 Mycelium Life 4.0</h1><p>Искусственный сетевой разум: 10 колоний · рост нитей · коллективная память · энергия и сигналы</p>
-<div class="stats"><div class="stat">Узлов<strong id="nodes">10</strong></div><div class="stat">День<strong id="day">0.0</strong></div><div class="stat">Источников<strong id="energyCount">0</strong></div><div class="stat">Активных сетей<strong id="alive">10</strong></div></div>
-<div class="toolbar"><button id="source">⚡ Добавить энергию</button><button id="add">🌱 Добавить колонии</button><button id="walls">🧱 Поставить стены</button><button id="pause">⏸ Пауза</button><button id="reset">↻ Новый мир</button></div>
-<div class="legend"><span>● Узлы</span><span>— Нити</span><span>◉ Источник</span><span>✦ Сигнал</span></div>
-<div class="scene"><canvas id="world"></canvas><div class="hint">Вращать пальцем · приблизить двумя пальцами · нажать на узел для наблюдения</div></div>
-<div class="toolbar"><button id="overview">◈ Весь куб</button><button id="signals">✦ Сигналы: вкл.</button><button id="xray">◉ Прозрачность: вкл.</button></div>
-<div class="columns"><section class="panel"><b>Колонии и распределение энергии</b><div id="species"></div></section><section class="panel"><b>Наблюдение за сетью</b><div id="detail" class="muted">Выберите узел внутри куба.</div><p class="muted">Нити растут только при наличии энергии. Найденные источники запоминаются колонией; информация распространяется по связям.</p></section></div>
-<section class="panel" style="margin-top:10px"><b>События сети</b><div class="log" id="log"></div></section>
-<p class="muted">Это модель искусственного распределённого поведения, вдохновлённая мицелием, а не точная биологическая симуляция. Внешний интернет и ИИ-модели пока не подключены.</p>
-</main><script>
-(()=>{
-'use strict';
-const $=id=>document.getElementById(id),canvas=$('world'),ctx=canvas.getContext('2d');
-const colors=['#ff6b6b','#64bcff','#ffd16a','#77e6a5','#c9a6ff','#ff9acb','#62ded7','#ff9e61','#b8da76','#c2c9d1'];
-const names=['Разведчики','Строители','Навигаторы','Собиратели','Связисты','Стратеги','Экономные','Быстрорастущие','Устойчивые','Адаптивные'];
-const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),D=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z),pos=()=>({x:rnd(-80,80),y:rnd(-80,80),z:rnd(-80,80)});
-let colonies=[],sources=[],walls=[],day=0,playing=true,started=false,signalsOn=true,transparent=true,selected=null,drag=null,angle=.7,pitch=.4,zoom=1,last=performance.now(),accum=0,nodeId=0,sourceId=0,canvasW=500,canvasH=500;
-const events=[];
-function log(s){events.unshift(day.toFixed(1)+' · '+s);events.length=Math.min(events.length,8);$('log').replaceChildren(...events.map(t=>{const d=document.createElement('div');d.textContent=t;return d}))}
-function colony(i){return {kind:i,nodes:[],links:[],energy:8,knowledge:new Map(),signals:[],speed:1+(i===0?.35:i===7?.25:0),efficiency:1+(i===3?.3:i===6?.4:0),range:22+(i===2?15:i===4?8:0),strategy:i%3,losses:0}}
-function addNode(c,p,parent){const n={id:++nodeId,p:{...p},parent:parent?.id||null,age:0,signal:0};c.nodes.push(n);if(parent)c.links.push({a:parent,b:n,age:0});return n}
-function addColonies(){for(let i=0;i<10;i++){const c=colonies[i];if(c.nodes.length>65)continue;addNode(c,pos());c.energy+=3}log('Добавлено 10 точек роста существующих колоний')}
-function reset(){colonies=colors.map((_,i)=>colony(i));sources=[];walls=[];day=0;started=false;playing=true;nodeId=0;sourceId=0;selected=null;events.length=0;for(const c of colonies)addNode(c,pos());$('pause').textContent='⏸ Пауза';$('walls').textContent='🧱 Поставить стены';log('Созданы 10 независимых сетей. Добавьте источник энергии для запуска времени.');update()}
-function addSource(){const p=pos();sources.push({id:++sourceId,p,energy:32});started=true;log('Новый ограниченный источник энергии: 32 единицы');update()}
-function addWalls(){if(walls.length){walls=[];$('walls').textContent='🧱 Поставить стены';log('Препятствия убраны')}else{for(let i=0;i<7;i++){const p=pos();walls.push({p,axis:Math.random()<.5?'x':'z',radius:rnd(12,25)})}$('walls').textContent='🚧 Убрать стены';log('Случайные препятствия установлены')}}
-function blocked(a,b){for(const w of walls){const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2,z:(a.z+b.z)/2};if(D(mid,w.p)<w.radius)return true}return false}
-function nearestSource(p,c){let best=null,score=Infinity;for(const s of sources){if(s.energy<=0)continue;const d=D(p,s.p);if(d<score){score=d;best=s}}return best}
-function chooseDirection(c,n){
- const known=[...c.knowledge.values()].filter(k=>sources.some(s=>s.id===k.id&&s.energy>0));
- let aim=null;
- if(known.length){known.sort((a,b)=>D(n.p,a.p)-D(n.p,b.p));aim=known[0].p}
- else if(c.strategy===1){const s=nearestSource(n.p,c);if(s&&D(n.p,s.p)<c.range*2)aim=s.p}
- const dir=aim?{x:aim.x-n.p.x+rnd(-10,10),y:aim.y-n.p.y+rnd(-10,10),z:aim.z-n.p.z+rnd(-10,10)}:{x:rnd(-1,1),y:rnd(-1,1),z:rnd(-1,1)};
- const len=Math.hypot(dir.x,dir.y,dir.z)||1;return {x:dir.x/len,y:dir.y/len,z:dir.z/len}
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mycelium Life — одна клетка</title><style>
+*{box-sizing:border-box}body{margin:0;background:#07151d;color:#e4f4f3;font:15px system-ui}main{max-width:900px;margin:auto;padding:14px}h1{font-size:23px;margin:8px 0 5px}p{color:#b0c9d0;line-height:1.5;margin:6px 0 13px}.status{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.status span{background:#16313e;padding:8px 12px;border-radius:9px}.scene{height:min(65vh,620px);min-height:350px;border:1px solid #356879;border-radius:16px;background:radial-gradient(ellipse,#123846,#07131d);position:relative;overflow:hidden}canvas{width:100%;height:100%;display:block;touch-action:none}.hint{position:absolute;bottom:8px;left:10px;font-size:12px;color:#abcbd0;pointer-events:none}.actions{display:flex;gap:9px;margin:12px 0}.actions button{flex:1;border:1px solid #55a0a4;background:#17616d;color:#fff;padding:15px 10px;border-radius:12px;font-size:16px;font-weight:700}.actions button.secondary{background:#16333d;flex:0 0 auto}.speech{background:#173340;border:1px solid #376576;border-radius:13px;padding:15px;min-height:94px}.speech b{display:block;margin-bottom:7px;color:#8ee4cb}.speech div{line-height:1.5}.meter{height:7px;background:#284350;border-radius:10px;overflow:hidden;margin-top:8px}.meter i{display:block;background:#6bd8bd;height:100%;transition:width .4s}.meta{display:flex;gap:15px;flex-wrap:wrap;color:#a9c8d0;font-size:12px;margin:9px 0}@media(max-width:600px){.scene{height:57vh;min-height:330px}.actions button{font-size:14px}}
+</style></head><body><main><h1>🌱 Mycelium Life</h1><p>Одна клетка. Один мир. Энергия, память и рост.</p><div class="status"><span>Опыт: <b id="level">0</b></span><span>Источников найдено: <b id="found">0</b></span><span>Состояние: <b id="mood">исследует</b></span></div><div class="scene"><canvas id="world"></canvas><div class="hint">Пальцем вращать куб · двумя пальцами приближать</div></div><div class="actions"><button id="energy">⚡ Дать энергию</button><button class="secondary" id="reset">↻ Сначала</button></div><section class="speech"><b>💬 Клетка</b><div id="words">Я здесь. Что находится вокруг?</div><div class="meter"><i id="bar" style="width:65%"></i></div></section><div class="meta"><span>Запас энергии: <b id="reserve">65%</b></span><span>Размер: <b id="size">1.0×</b></span><span>Возраст: <b id="age">0</b></span></div><p style="font-size:12px">Клетка реагирует на опыт и энергию по правилам симуляции. Это не подключённая языковая модель: просьбы формируются из её состояния и памяти.</p></main>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id),canvas=$('world'),ctx=canvas.getContext('2d');let w=500,h=500,dpr=1;
+let cell,source,angle=.7,pitch=.38,zoom=1,drag=null,pointers=new Map(),lastPinch=0,last=performance.now(),uiTimer=0,requestTime=0,prevMood='',lastMessage='',messageIndex=0;
+const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z),randPos=()=>({x:rnd(-75,75),y:rnd(-75,75),z:rnd(-75,75)});
+function say(t){if(t!==lastMessage){$('words').textContent=t;lastMessage=t}}
+function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10)};source=null;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
+function project(p){const x=p.x*Math.cos(angle)-p.z*Math.sin(angle),z=p.x*Math.sin(angle)+p.z*Math.cos(angle),y=p.y*Math.cos(pitch)-z*Math.sin(pitch);const scale=Math.min(w,h)*.00255*zoom;return{x:w/2+x*scale,y:h/2-y*scale,scale}}
+function line(a,b,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+function draw(){ctx.clearRect(0,0,w,h);const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});const pp=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++){const d=dist(corners[i],corners[j]);if(Math.abs(d-200)<.01)line(pp[i],pp[j],'rgba(130,207,226,.48)',1)}
+if(source){const s=project(source.p),r=7+Math.sin(cell.age*5)*2;ctx.shadowColor='#ffe477';ctx.shadowBlur=18;ctx.strokeStyle='#ffdf72';ctx.lineWidth=2;ctx.beginPath();ctx.arc(s.x,s.y,r,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#fff0a5';ctx.beginPath();ctx.arc(s.x,s.y,3,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
+const p=project(cell.p),q=project({x:cell.p.x+cell.v.x*25,y:cell.p.y+cell.v.y*25,z:cell.p.z+cell.v.z*25}),theta=Math.atan2(q.y-p.y,q.x-p.x);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(theta);const hunger=clamp(cell.energy/65,0,1),r=(7+cell.size*3)*zoom;ctx.globalAlpha=.3+.7*hunger;ctx.shadowColor='#6de8ca';ctx.shadowBlur=12+cell.size*2;const g=ctx.createRadialGradient(-r*.2,-r*.25,1,0,0,r*1.2);g.addColorStop(0,'#d8fff1');g.addColorStop(.45,'#7de9c8');g.addColorStop(1,'#218e91');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(0,0,r*(1+cell.elongation),r*(1-.18*cell.elongation),0,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='#a4f5dc';ctx.lineWidth=1.2;ctx.stroke();ctx.globalAlpha=.75;ctx.fillStyle='#195c65';ctx.beginPath();ctx.arc(r*.14,0,Math.max(2,r*.23),0,Math.PI*2);ctx.fill();ctx.restore()}
+function chooseRequest(){const n=cell.experience;if(n<1)return ['Энергия?..','Здесь пусто. Можно немного энергии?','Я всё ещё ищу…'][messageIndex++%3];if(n<3)return ['Я помню, где нашла первый источник. Покажи мне ещё один?','Я научилась двигаться к светящейся энергии. Можно попробовать снова?','Мне трудно двигаться без энергии. Поможешь?'][messageIndex++%3];if(n<6)return ['Я стала длиннее и лучше выбираю направление. Дай мне новый источник — хочу проверить свой путь.','Я уже помню '+cell.found+' источника. Мне нужна энергия, чтобы продолжить исследование.','Каждый новый источник меняет мою форму. Мне хочется узнать, какой я стану дальше.'][messageIndex++%3];return ['Я исследовала '+cell.found+' источников и научилась точнее поворачивать. Мне не хватает энергии для следующего открытия.','Я сохранила свои маршруты и опыт. Создай новый источник, и я попробую добраться до него ещё эффективнее.','Я стала сложнее, но мир вокруг по-прежнему огромен. Поможешь мне продолжить путешествие?'][messageIndex++%3]}
+function step(dt){cell.age+=dt;const hunger=source?0:dt*(cell.energy>15?1.6:.7);cell.energy=Math.max(0,cell.energy-hunger);cell.starve=clamp((30-cell.energy)/30,0,1);
+let target;if(source){target=source.p}else{const t=cell.age*.3+cell.drift;target={x:75*Math.sin(t*.49),y:70*Math.cos(t*.37),z:70*Math.sin(t*.31+1)}}
+const dx=target.x-cell.p.x,dy=target.y-cell.p.y,dz=target.z-cell.p.z,len=Math.hypot(dx,dy,dz)||1;
+const agility=1+Math.min(.9,cell.experience*.09),speed=(source?14:6)*(1-.65*cell.starve)*agility;
+const k=Math.min(1,dt*(1.5+cell.experience*.06));cell.v.x+=(dx/len-cell.v.x)*k;cell.v.y+=(dy/len-cell.v.y)*k;cell.v.z+=(dz/len-cell.v.z)*k;
+const vl=Math.hypot(cell.v.x,cell.v.y,cell.v.z)||1;cell.v.x/=vl;cell.v.y/=vl;cell.v.z/=vl;
+cell.p.x=clamp(cell.p.x+cell.v.x*speed*dt,-93,93);cell.p.y=clamp(cell.p.y+cell.v.y*speed*dt,-93,93);cell.p.z=clamp(cell.p.z+cell.v.z*speed*dt,-93,93);
+if(source&&dist(cell.p,source.p)<7){cell.found++;cell.experience++;cell.memory.push({...source.p});cell.energy=clamp(cell.energy+52,0,100);cell.size=Math.min(4,cell.size+.22);cell.elongation=Math.min(1.25,cell.elongation+.15);source=null;requestTime=cell.age+7;say(cell.experience===1?'Я нашла энергию! Теперь я знаю, как к ней двигаться.':cell.experience<4?'Получилось! Я запомнила ещё один путь и немного выросла.':'Я снова нашла источник. Моё движение становится точнее, а тело — длиннее.')}
+if(!source&&cell.energy<34&&cell.age>requestTime){say(chooseRequest());requestTime=cell.age+clamp(13-cell.experience*.5,6,13)}
 }
-function step(dt){
- if(!started)return;day+=dt;
- for(const c of colonies){
-  if(!c.nodes.length)continue;
-  // Network metabolism is small but nonzero; it scales with the actual length of the network.
-  c.energy-=dt*(.015+.0008*c.links.length)/c.efficiency;
-  for(const n of c.nodes){n.age+=dt;n.signal=Math.max(0,n.signal-dt*1.6)}
-  for(const s of sources){
-   if(s.energy<=0)continue;
-   let nearest=null,best=Infinity;
-   for(const n of c.nodes){const d=D(n.p,s.p);if(d<best){best=d;nearest=n}}
-   if(nearest&&best<8){const amount=Math.min(s.energy,dt*2.8*c.efficiency);s.energy-=amount;c.energy=Math.min(80,c.energy+amount);c.knowledge.set(s.id,{id:s.id,p:{...s.p}});nearest.signal=1;
-    if(!c.signals.some(x=>x.source===s.id&&x.time>day-1)){c.signals.push({source:s.id,time:day});if(c.signals.length>16)c.signals.shift()}
-   }else if(nearest&&best<c.range){c.knowledge.set(s.id,{id:s.id,p:{...s.p}});nearest.signal=Math.max(nearest.signal,.65)}
-  }
-  // Signals travel through connections and are visible as pulses.
-  for(const l of c.links){if(l.a.signal>l.b.signal+.2)l.b.signal=Math.max(l.b.signal,l.a.signal*.83);else if(l.b.signal>l.a.signal+.2)l.a.signal=Math.max(l.a.signal,l.b.signal*.83)}
-  if(c.energy<.15){c.energy=0;continue}
-  const maxNodes=60;
-  const growChance=dt*(.48*c.speed)*(c.energy>2?1:.2);
-  if(c.nodes.length<maxNodes&&Math.random()<growChance){
-   const n=c.nodes[Math.floor(Math.random()*c.nodes.length)],dir=chooseDirection(c,n);
-   const len=rnd(6,13),p={x:clamp(n.p.x+dir.x*len,-94,94),y:clamp(n.p.y+dir.y*len,-94,94),z:clamp(n.p.z+dir.z*len,-94,94)};
-   if(!blocked(n.p,p)&&!c.nodes.some(v=>D(v.p,p)<5)){
-    addNode(c,p,n);c.energy-=.25/c.efficiency;
-    if(c.nodes.length%15===0)log('Колония '+(c.kind+1)+' расширила сеть до '+c.nodes.length+' узлов')
-   }
-  }
-  // Existing networks can reconnect nearby branches, reducing path redundancy.
-  if(c.nodes.length>4&&c.links.length<c.nodes.length*1.16&&Math.random()<dt*.05){
-   const a=c.nodes[Math.floor(Math.random()*c.nodes.length)];
-   const b=c.nodes.find(n=>n!==a&&D(n.p,a.p)>8&&D(n.p,a.p)<19&&!c.links.some(l=>(l.a===a&&l.b===n)||(l.b===a&&l.a===n)));
-   if(b&&c.energy>.7&&!blocked(a.p,b.p)){c.links.push({a,b,age:0});c.energy-=.2}
-  }
-  for(const [id] of c.knowledge)if(!sources.some(s=>s.id===id&&s.energy>0))c.knowledge.delete(id);
- }
- sources=sources.filter(s=>s.energy>.001);
-}
-function project(p){
- const a=angle,b=pitch,xx=p.x*Math.cos(a)-p.z*Math.sin(a),zz=p.x*Math.sin(a)+p.z*Math.cos(a),yy=p.y*Math.cos(b)-zz*Math.sin(b),depth=p.y*Math.sin(b)+zz*Math.cos(b);
- const size=Math.min(canvasW,canvasH)*.00245*zoom;
- return {x:canvasW/2+xx*size,y:canvasH/2-yy*size,depth,size}
-}
-function line(a,b,color,width=1,alpha=1){ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.globalAlpha=1}
-function render(){
- ctx.clearRect(0,0,canvasW,canvasH);
- const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});
- const ps=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++){const d=Math.abs(corners[i].x-corners[j].x)+Math.abs(corners[i].y-corners[j].y)+Math.abs(corners[i].z-corners[j].z);if(d===200)line(ps[i],ps[j],'#78c6e2',1.15,.5)}
- for(const w of walls){const p=project(w.p);ctx.fillStyle='rgba(129,184,199,.18)';ctx.fillRect(p.x-w.radius*p.size,p.y-3,p.size*w.radius*2,6)}
- const dots=[];
- for(const c of colonies){const col=colors[c.kind];
-  for(const l of c.links){const a=project(l.a.p),b=project(l.b.p);line(a,b,col,1.1,transparent?.65:1);if(signalsOn&&Math.max(l.a.signal,l.b.signal)>.15){const t=(day*2)%1;const x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;ctx.fillStyle='#ffffff';ctx.globalAlpha=.8;ctx.beginPath();ctx.arc(x,y,1.7,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1}}
-  for(const n of c.nodes)dots.push({p:project(n.p),n,c});
- }
- dots.sort((a,b)=>a.p.depth-b.p.depth);
- for(const {p,n,c} of dots){ctx.fillStyle=colors[c.kind];ctx.globalAlpha=transparent?.9:1;ctx.beginPath();ctx.arc(p.x,p.y,selected?.n===n?4.2:2.2,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1}
- for(const s of sources){const p=project(s.p);ctx.strokeStyle='#ffd15c';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#ffd15c';ctx.beginPath();ctx.arc(p.x,p.y,2.5,0,Math.PI*2);ctx.fill()}
-}
-function update(){
- $('nodes').textContent=colonies.reduce((n,c)=>n+c.nodes.length,0);$('day').textContent=day.toFixed(1);$('energyCount').textContent=sources.length;$('alive').textContent=colonies.filter(c=>c.energy>0).length;
- const holder=$('species');holder.replaceChildren(...colonies.map(c=>{const d=document.createElement('div');d.className='species';const sw=document.createElement('i');sw.className='swatch';sw.style.background=colors[c.kind];const label=document.createElement('span');label.textContent=(c.kind+1)+'. '+names[c.kind]+' · '+c.nodes.length+' узлов';const en=document.createElement('span');en.textContent='⚡ '+c.energy.toFixed(1);d.append(sw,label,en);return d}));
- if(selected){const c=selected.c,n=selected.n;$('detail').textContent='Колония '+(c.kind+1)+' · узел №'+n.id+'\nВозраст: '+n.age.toFixed(1)+' суток\nЭнергия сети: '+c.energy.toFixed(1)+'\nСвязей: '+c.links.length+'\nИзвестных источников: '+c.knowledge.size+'\nАктивность сигнала: '+Math.round(n.signal*100)+'%'}
-}
-function resize(){const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,1.5);canvasW=r.width;canvasH=r.height;canvas.width=Math.round(canvasW*dpr);canvas.height=Math.round(canvasH*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
-new ResizeObserver(resize).observe(canvas);resize();
-canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,moved:false};canvas.setPointerCapture(e.pointerId)});
-canvas.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>3)drag.moved=true;angle-=dx*.008;pitch=clamp(pitch+dy*.008,-1.35,1.35);drag.x=e.clientX;drag.y=e.clientY});
-canvas.addEventListener('pointerup',e=>{if(!drag)return;const moved=drag.moved;drag=null;if(moved)return;const rect=canvas.getBoundingClientRect(),p={x:e.clientX-rect.left,y:e.clientY-rect.top};let best=null,dist=12;for(const c of colonies)for(const n of c.nodes){const q=project(n.p),d=Math.hypot(q.x-p.x,q.y-p.y);if(d<dist){dist=d;best={c,n}}}selected=best;update()});
-canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=clamp(zoom*Math.exp(-e.deltaY*.001),.5,2.5)},{passive:false});
-let pinch=0;canvas.addEventListener('touchmove',e=>{if(e.touches.length===2){const a=e.touches[0],b=e.touches[1],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(pinch)zoom=clamp(zoom*d/pinch,.5,2.5);pinch=d}},{passive:true});canvas.addEventListener('touchend',()=>pinch=0);
-$('source').onclick=addSource;$('add').onclick=addColonies;$('walls').onclick=addWalls;$('pause').onclick=()=>{playing=!playing;$('pause').textContent=playing?'⏸ Пауза':'▶ Продолжить'};$('reset').onclick=reset;$('overview').onclick=()=>{zoom=1;angle=.7;pitch=.4;selected=null;update()};$('signals').onclick=()=>{signalsOn=!signalsOn;$('signals').textContent='✦ Сигналы: '+(signalsOn?'вкл.':'выкл.')};$('xray').onclick=()=>{transparent=!transparent;$('xray').textContent='◉ Прозрачность: '+(transparent?'вкл.':'выкл.')};
-function frame(now){requestAnimationFrame(frame);if(now-last<33)return;const dt=Math.min(.06,(now-last)/1000);last=now;if(playing){accum+=dt;while(accum>.05){step(.05);accum-=.05}}render();if(Math.floor(now/500)!==Math.floor((now-dt*1000)/500))update()}
-reset();requestAnimationFrame(frame);
+function updateUI(){$('level').textContent=cell.experience;$('found').textContent=cell.found;$('reserve').textContent=Math.round(cell.energy)+'%';$('bar').style.width=cell.energy+'%';$('size').textContent=cell.size.toFixed(1)+'×';$('age').textContent=Math.floor(cell.age);const mood=source?'идёт к энергии':cell.energy<12?'сильно ослабла':cell.energy<34?'голодает':'исследует';$('mood').textContent=mood}
+$('energy').onclick=()=>{source={p:randPos()};say(cell.experience===0?'Я чувствую что-то новое… Плыву туда!':cell.energy<20?'Ты меня услышал! Я постараюсь добраться до источника.':'Я вижу новый источник. Проверю, поможет ли мой опыт.');requestTime=cell.age+9;updateUI()};
+$('reset').onclick=init;
+function resize(){const r=canvas.getBoundingClientRect();w=r.width;h=r.height;dpr=Math.min(devicePixelRatio||1,1.5);canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}new ResizeObserver(resize).observe(canvas);resize();
+canvas.addEventListener('pointerdown',e=>{pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1){angle-=(e.clientX-old.x)*.008;pitch=clamp(pitch+(e.clientY-old.y)*.008,-1.4,1.4)}else if(pointers.size===2){const [a,b]=[...pointers.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(lastPinch)zoom=clamp(zoom*d/lastPinch,.5,2.7);lastPinch=d}});
+const end=e=>{pointers.delete(e.pointerId);lastPinch=0};canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=clamp(zoom*Math.exp(-e.deltaY*.001),.5,2.7)},{passive:false});
+function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/1000,.08);last=now;step(dt);draw();uiTimer+=dt;if(uiTimer>.35){updateUI();uiTimer=0}}init();requestAnimationFrame(frame);
 })();
 </script></body></html>
