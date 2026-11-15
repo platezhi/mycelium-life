@@ -150,7 +150,7 @@ function renderSpeciesLosses(){
  const root=$('speciesLosses');
  const living=new Map();
  for(const a of cells)living.set(a.color,(living.get(a.color)||0)+1);
- const kinds=SPECIES_COLORS.filter(k=>living.has(k)||speciesLosses.has(k));
+ const kinds=SPECIES_COLORS.filter(k=>living.has(k)||(speciesLosses.get(k)||0)>0);
  if(!kinds.length){root.textContent='Пока видов нет';return}
  const max=Math.max(1,...kinds.map(k=>speciesLosses.get(k)||0));
  root.replaceChildren();
@@ -414,7 +414,7 @@ async function load(){
  try{
   const r=await fetch('./state.json?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);
   const s=await r.json();day=s.day||0;cells=s.cells.slice(0,10).map(a=>({...a,known:null,age:a.age||0,fedOnce:false,fedSources:[],feedCooldowns:{},mind:{visits:0,failedMoves:0,mode:'исследование'},color:newColor(),birthDay:day-(a.age||0),pushedUntil:0,stuckUntil:0,distanceTravelled:0}));
- normalizeSpecies();speciesLosses.clear();speciesPain.clear();lastCellSpeech=-Infinity;pendingWish=null;lastAskingCellId=-1;showWish('💬 Клетки пока молчат…');born=s.born||0;dead=0;nextId=s.next_id||101;for(const a of cells)registerSpecies(a);sources=[];sourceVersion++;navCache.clear();huntTeams.clear();
+ normalizeSpecies();speciesLosses.clear();speciesPain.clear();lastCellSpeech=-Infinity;pendingWish=null;lastAskingCellId=-1;showWish('💬 Клетки пока молчат…');born=s.born||0;dead=0;nextId=s.next_id||101;sources=[];sourceVersion++;navCache.clear();huntTeams.clear();
   $('updated').textContent='Сохранено: '+new Date(s.updated).toLocaleString('ru-RU');
   $('mode').textContent='Загружен снимок GitHub. Добавь источники и нажми «Начать локальную симуляцию».';
   draw();
@@ -423,9 +423,9 @@ async function load(){
 function addColony(){
  const n=Math.min(10,Math.max(0,500-cells.length));
  for(let i=0;i<n;i++)cells.push({id:nextId++,...spawnPoint(),age:0,energy:1,progress:0,generation:1,dna:Array.from({length:6},()=>Math.random()-.5),signal:0,known:null,fedOnce:false,fedSources:[],feedCooldowns:{},mind:{visits:0,failedMoves:0,mode:'исследование'},heading:Math.random()*Math.PI*2,color:newColor(),birthDay:day,pushedUntil:0,stuckUntil:0});
- $('detail').textContent='Добавлено '+n+' клеток. Старые клетки сохранены. Всего: '+cells.length;
+ $('detail').textContent='Добавлено '+n+' клеток. Старые клетки сохранены. Всего: '+cells.length+'. Показатели погибших не изменены добавлением.';
  $('mode').textContent='Локальная симуляция идёт; GitHub не изменён.';
- for(const a of cells)registerSpecies(a);
+ 
  running=true;draw();
 }
 $('restart').onclick=addColony;
