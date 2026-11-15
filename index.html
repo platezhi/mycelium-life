@@ -8,17 +8,17 @@ let cell,sources=[],branches=[],nodes=[],particles=[],nextSourceId=0,angle=.7,pi
 const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z),randPos=()=>({x:rnd(-75,75),y:rnd(-75,75),z:rnd(-75,75)});
 function say(t){if(t!==lastMessage){$('words').textContent=t;lastMessage=t}}
 const N=100,GRID=170,spacing=GRID/(N-1),ix=(x,y)=>y*N+x;
-let matter=new Float32Array(N*N),buffer=new Float32Array(N*N),chem=new Float32Array(N*N),chemBuffer=new Float32Array(N*N),totalMatter=0,simClock=0;
+let footprint=new Float32Array(N*N),matter=new Float32Array(N*N),buffer=new Float32Array(N*N),chem=new Float32Array(N*N),chemBuffer=new Float32Array(N*N),totalMatter=0,simClock=0;
 const gridPos=p=>({x:clamp(Math.round((p.x+85)/spacing),1,N-2),y:clamp(Math.round((p.y+85)/spacing),1,N-2)});
 function init(){
  cell={p:{x:0,y:0,z:0},energy:65,experience:0,found:0,size:1,mass:1,age:0,starve:0,memory:[],wander:{x:rnd(-65,65),y:rnd(-65,65),z:0},nextWander:0};
- sources=[];nextSourceId=0;matter.fill(0);buffer.fill(0);chem.fill(0);chemBuffer.fill(0);simClock=0;
+ sources=[];nextSourceId=0;matter.fill(0);footprint.fill(0);buffer.fill(0);chem.fill(0);chemBuffer.fill(0);simClock=0;
  // One compact connected droplet, 10 world units in radius.
  totalMatter=0;
  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
   const wx=x*spacing-85,wy=y*spacing-85,r=Math.hypot(wx,wy);
   const value=1/(1+Math.exp((r-8.5)*.95));
-  matter[ix(x,y)]=value;totalMatter+=value;
+  matter[ix(x,y)]=value;footprint[ix(x,y)]=value*.12;totalMatter+=value;
  }
  requestTime=0;messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()
 }
@@ -35,7 +35,7 @@ function draw(){
  }
  // Draw the continuous material density on the rotated world plane, not radial lobes or limbs.
  // Smooth contours emerge from local transport and surface tension.
- const threshold=.33;
+ const threshold=.16;
  ctx.save();ctx.globalAlpha=.93;
  for(let y=1;y<N-2;y++)for(let x=1;x<N-2;x++){
   const i=ix(x,y),v=matter[i];if(v<threshold)continue;
@@ -44,7 +44,7 @@ function draw(){
   const py=project({x:x*spacing-85,y:(y+1)*spacing-85,z:0});
   const gx=matter[i+1]-matter[i-1],gy=matter[i+N]-matter[i-N];
   const light=clamp(.76-gx*.7+gy*.8,0,1);
-  const opacity=clamp((v-threshold)*3.8,0,1);
+  const opacity=clamp((v-threshold)*4.2,0,1);
   ctx.fillStyle='rgba('+Math.round(125+100*light)+','+Math.round(175+73*light)+','+Math.round(184+68*light)+','+opacity+')';
   ctx.beginPath();ctx.moveTo(p.x,p.y);
   ctx.lineTo(px.x,px.y);ctx.lineTo(px.x+py.x-p.x,px.y+py.y-p.y);ctx.lineTo(py.x,py.y);ctx.closePath();ctx.fill();
@@ -65,29 +65,40 @@ function step(dt){
   if(!sources.length){const dx=wx-cell.wander.x,dy=wy-cell.wander.y;concentration=.24*Math.exp(-(dx*dx+dy*dy)/(2*45*45))}
   chem[i]=concentration;
  }
- // Conservative neighbor-to-neighbor material transport: no teleportation or detached arms.
- // Surface tension smooths the perimeter; nutrient gradients bias local flow.
+ // Local flux: grow from the existing perimeter, never create new remote blobs.
+ // Retained footprint represents already colonized tissue and slows its retraction.
  buffer.set(matter);
- const flow=dt*6.0;
+ const flow=dt*2.8;
  for(let y=2;y<N-2;y++)for(let x=2;x<N-2;x++){
   const i=ix(x,y);
   for(const j of [i+1,i+N]){
    const a=matter[i],b=matter[j];
-   const chemDrive=(chem[j]-chem[i])*5;
-   const spread=(a-b)*.12;
-   const flux=clamp(flow*(spread+chemDrive*Math.min(a,b+.12)), -b*.23,a*.23);
+   const gradient=(chem[j]-chem[i])*3.2;
+   const diff=(a-b)*.09;
+   const flux=clamp(flow*(diff+gradient*Math.min(a,b+.055)),-b*.095,a*.095);
    buffer[i]-=flux;buffer[j]+=flux;
   }
  }
- // A weak rhythmic contractile wave creates ongoing cytoplasmic streaming.
+ // Surface tension is deliberately weak; excessive isotropic diffusion makes round petals.
  for(let y=2;y<N-2;y++)for(let x=2;x<N-2;x++){
   const i=ix(x,y),v=matter[i],lap=matter[i-1]+matter[i+1]+matter[i-N]+matter[i+N]-4*v;
-  buffer[i]+=dt*.08*lap;
+  const oscillation=Math.sin(cell.age*.65+x*.11-y*.08);
+  buffer[i]+=dt*.018*lap+dt*.003*oscillation*v;
  }
- // Keep total mass conserved during locomotion; food adds only a small amount.
- let sum=0;for(let i=0;i<buffer.length;i++){buffer[i]=Math.max(0,buffer[i]);sum+=buffer[i]}
+ // Retain a fraction of material in previously explored territory.
+ // Redistribute the rest locally instead of normalizing all mass into a central peak.
+ let sum=0;
+ for(let i=0;i<buffer.length;i++){
+  buffer[i]=Math.max(0,buffer[i]);
+  const retained=Math.min(footprint[i],.18);
+  buffer[i]=Math.max(buffer[i],retained);
+  sum+=buffer[i];
+ }
  const correction=totalMatter/Math.max(.00001,sum);
- for(let i=0;i<buffer.length;i++)buffer[i]*=correction;
+ for(let i=0;i<buffer.length;i++){
+  buffer[i]*=correction;
+  footprint[i]=Math.max(footprint[i],Math.min(.16,buffer[i]*.20));
+ }
  [matter,buffer]=[buffer,matter];
  let eaten=0;
  for(const s of [...sources]){
@@ -97,7 +108,7 @@ function step(dt){
   if(s.energy<=.001){
    sources.splice(sources.indexOf(s),1);cell.found++;cell.experience++;cell.memory.push({...s.p});
    cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);
-   const extra=totalMatter*.035;totalMatter+=extra;matter[ix(p.x,p.y)]+=extra;
+   const extra=totalMatter*.07;totalMatter+=extra;for(let oy=-2;oy<=2;oy++)for(let ox=-2;ox<=2;ox++){const k=ix(p.x+ox,p.y+oy);matter[k]+=extra/25;footprint[k]=Math.max(footprint[k],.11)}
    eaten++;
   }
  }
