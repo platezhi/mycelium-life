@@ -1,5 +1,5 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mycelium Life — поиск энергии</title><style>
-*{box-sizing:border-box}body{margin:0;background:#071a23;color:#e3f4ec;font:15px system-ui}main{max-width:860px;margin:auto;padding:16px}h1{font-size:25px}canvas{width:100%;height:auto;background:#0b2931;border-radius:14px;display:block;touch-action:manipulation}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.stat{padding:12px;background:#16323a;border-radius:10px}.stat strong{display:block;font-size:21px}button{background:#27816c;color:white;border:0;padding:12px 16px;border-radius:9px;font-weight:600}small{color:#b2c9c3}pre{white-space:pre-wrap;word-break:break-word;background:#16323a;padding:12px;border-radius:9px}a{color:#91e5ce}input{width:100%;accent-color:#62d6a4}.controls{background:#16323a;padding:15px;border-radius:12px;margin:12px 0}.muted{color:#b2c9c3}</style></head><body><main><h1>Мицелий — поиск энергии</h1><p>наследование цвета и скорости · препятствия · столкновения поколений</p><div class="stats"><div class="stat">Клеток<strong id="count">—</strong></div><div class="stat">Вирт. суток<strong id="day">—</strong></div><div class="stat">Родилось / погибло<strong id="events">—</strong></div></div><canvas id="world" width="760" height="520"></canvas><div class="controls"><b>Эксперимент: источник энергии</b><p>Каждое касание поля добавляет новый источник, даже поверх клеток. Каждый источник содержит ровно 30 порций. Каждая подпитка расходует одну порцию; повторная подпитка той же клетки возможна через 0,25 виртуальных суток. Затем источник исчезает. Все клетки узнают об исчезновении. Красная кнопка отключает все источники. Касание клетки показывает её состояние.</p><label for="power">Мощность источника: <strong id="powerValue">100%</strong></label><input id="power" type="range" min="0" max="300" step="10" value="100"><p><strong id="sourceCount">Источников: 0</strong></p><p><button id="inspectMode">Режим: добавление источников</button></p><p><button id="removeSource" style="background:#bd3548;width:100%;font-size:17px;padding:17px">⛔ ОСТАНОВИТЬ ПОДАЧУ ЭНЕРГИИ</button></p><p><button id="restart">Добавить 100 клеток</button></p><p><button id="start">Начать локальную симуляцию</button> <button id="pause">Пауза</button></p><small id="mode">Сначала загружается состояние из GitHub. Эксперимент в браузере не записывается в GitHub.</small></div><details class="controls" open><summary><b>⚙️ Условия жизни — шкалы</b></summary><p>Параметры локальной симуляции. Сохраняются на этом устройстве.</p><div id="sliders"></div><button id="resetRules">Сбросить настройки</button></details><p><button id="refresh">Загрузить состояние GitHub</button> <small id="updated"></small></p><h3>Клетка</h3><pre id="detail">Клетка не выбрана</pre><small>В браузерном эксперименте время ускорено: около 1 виртуальных суток за 1 реальную секунду. В сохранённом расчёте GitHub 1 виртуальные сутки = 10 реальных минут. Цвет обозначает родословную: потомки наследуют цвет родителя. Скорость зависит от числа разных источников, от которых клетка питалась (1 — ×1, 2 — ×2, 3 — ×3), и наследуется потомками. Старение и расход энергии замедлены в 50 раз; накопление прогресса деления ускорено в 2 раза. Питание от нового источника повышает наследуемую скорость. Питание пополняет энергию и жизненный ресурс. После первого питания клетка становится вдвое крупнее. Стены нужно обходить; старшие по хронологическому возрасту клетки отталкивают младших. Пять клеток одного цвета могут окружить и уничтожить клетку другого цвета. Движение, старение и размножение настраиваются шкалами. GitHub Actions ведёт отдельный сохранённый расчёт. Это модель, а не доказательство возникновения жизни.</small></main><script>
+*{box-sizing:border-box}body{margin:0;background:#071a23;color:#e3f4ec;font:15px system-ui}main{max-width:860px;margin:auto;padding:16px}h1{font-size:25px}canvas{width:100%;height:auto;background:#0b2931;border-radius:14px;display:block;touch-action:manipulation}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.stat{padding:12px;background:#16323a;border-radius:10px}.stat strong{display:block;font-size:21px}button{background:#27816c;color:white;border:0;padding:12px 16px;border-radius:9px;font-weight:600}small{color:#b2c9c3}pre{white-space:pre-wrap;word-break:break-word;background:#16323a;padding:12px;border-radius:9px}a{color:#91e5ce}input{width:100%;accent-color:#62d6a4}.controls{background:#16323a;padding:15px;border-radius:12px;margin:12px 0}.muted{color:#b2c9c3}</style></head><body><main><h1>Мицелий — поиск энергии</h1><p>наследование цвета и скорости · препятствия · столкновения поколений</p><div class="stats"><div class="stat">Клеток<strong id="count">—</strong></div><div class="stat">Вирт. суток<strong id="day">—</strong></div><div class="stat">Родилось / погибло<strong id="events">—</strong></div></div><canvas id="world" width="760" height="520"></canvas><div class="controls"><b>Эксперимент: источник энергии</b><p>Каждое касание поля добавляет новый источник, даже поверх клеток. Каждый источник содержит ровно 30 порций. Каждая подпитка расходует одну порцию; повторная подпитка той же клетки возможна через 0,25 виртуальных суток. Затем источник исчезает. Все клетки узнают об исчезновении. Красная кнопка отключает все источники. Касание клетки показывает её состояние.</p><label for="power">Мощность источника: <strong id="powerValue">100%</strong></label><input id="power" type="range" min="0" max="300" step="10" value="100"><p><strong id="sourceCount">Источников: 0</strong></p><p><button id="inspectMode">Режим: добавление источников</button></p><p><button id="removeSource" style="background:#bd3548;width:100%;font-size:17px;padding:17px">⛔ ОСТАНОВИТЬ ПОДАЧУ ЭНЕРГИИ</button></p><p><button id="restart">Добавить 100 клеток</button></p><p><button id="start">Начать локальную симуляцию</button> <button id="pause">Пауза</button></p><small id="mode">Сначала загружается состояние из GitHub. Эксперимент в браузере не записывается в GitHub.</small></div><details class="controls" open><summary><b>⚙️ Условия жизни — шкалы</b></summary><p>Параметры локальной симуляции. Сохраняются на этом устройстве.</p><div id="sliders"></div><button id="resetRules">Сбросить настройки</button></details><p><button id="refresh">Загрузить состояние GitHub</button> <small id="updated"></small></p><h3>Клетка</h3><pre id="detail">Клетка не выбрана</pre><small>В браузерном эксперименте время ускорено: около 1 виртуальных суток за 1 реальную секунду. В сохранённом расчёте GitHub 1 виртуальные сутки = 10 реальных минут. Цвет обозначает родословную: потомки наследуют цвет родителя. Скорость зависит от числа разных источников, от которых клетка питалась (1 — ×1, 2 — ×2, 3 — ×3), и наследуется потомками. Старение и расход энергии замедлены в 50 раз; накопление прогресса деления ускорено в 2 раза. Питание от нового источника повышает наследуемую скорость. Питание пополняет энергию и жизненный ресурс. После первого питания клетка становится вдвое крупнее. Стены нужно обходить; старшие по хронологическому возрасту клетки отталкивают младших. Когда клеток больше, чем оставшихся порций питания, группы по пять клеток одного цвета начинают охоту: окружают чужую клетку и уничтожают её. У источников старшие клетки отталкивают младших. Движение, старение и размножение настраиваются шкалами. GitHub Actions ведёт отдельный сохранённый расчёт. Это модель, а не доказательство возникновения жизни.</small></main><script>
 const c=document.getElementById('world'),ctx=c.getContext('2d'),$=id=>document.getElementById(id);let cells=[],sources=[],inspectMode=false,sourceVersion=0,day=0,born=0,dead=0,running=false,last=0,acc=0,nextId=101,firstId=null;
 const definitions=[['life','Продолжительность жизни','сут.',1,30,1,7],['movement','Скорость движения','ед./сут.',0,80,1,23],['aging','Ускорение старения','%',0,100,5,30],['cost','Расход энергии при движении','%',0,50,1,5.5],['sense','Радиус обнаружения','ед.',5,150,5,32],['signal','Дальность сигнала','ед.',5,150,5,40],['repro','Порог размножения','ед.',1,20,.5,3.5],['bonus','Бонус первому','%',0,100,5,10],['tempo','Скорость времени','сут./сек.',.1,5,.1,1]];
 let settings={};try{settings=JSON.parse(localStorage.getItem('mycelium-rules-v1')||'{}')}catch(e){}
@@ -58,6 +58,9 @@ function resolveCellCollisions(dt){
     if(Math.abs(ageA-ageB)<.1)continue;
     const elder=ageA>ageB?a:b,younger=elder===a?b:a;
     if(day<(younger.pushedUntil||0))continue;
+    // Elders dominate access to food; active attackers can keep their encirclement.
+    if(!sources.some(s=>dist(elder,s)<90||dist(younger,s)<90))continue;
+    if(elder.color!==younger.color&&elder.huntingTarget===younger.id)continue;
     const angle=Math.atan2(younger.y-elder.y,younger.x-elder.x);
     const direction=Number.isFinite(angle)?angle:Math.random()*Math.PI*2;
     const strength=14;
@@ -66,6 +69,26 @@ function resolveCellCollisions(dt){
    }
   }
  }
+}
+// Scarcity drives cooperative hunting between feedings.
+function huntingOrders(){
+ const orders=new Map(),clans=new Map();
+ for(const a of cells){if(!clans.has(a.color))clans.set(a.color,[]);clans.get(a.color).push(a)}
+ const shortage=cells.length>sources.reduce((n,s)=>n+s.remaining,0);
+ if(!shortage)return orders;
+ for(const [color,members] of clans){
+  if(members.length<5)continue;
+  let victim=null,best=Infinity;
+  for(const other of cells){
+   if(other.color===color)continue;
+   const center=members.reduce((sum,a)=>sum+dist(a,other),0)/members.length;
+   if(center<best){best=center;victim=other}
+  }
+  if(!victim)continue;
+  const attackers=[...members].sort((a,b)=>dist(a,victim)-dist(b,victim)).slice(0,5);
+  attackers.forEach((a,i)=>orders.set(a.id,{victim,angle:i*Math.PI*2/5}));
+ }
+ return orders;
 }
 // Five touching attackers of one lineage must surround the victim angularly.
 function resolveEncirclements(){
@@ -120,13 +143,21 @@ function draw(){
 }
 function step(dt){
  const next=[];
+ const orders=huntingOrders();
  for(const a of cells){
    if(!Number.isFinite(a.heading))a.heading=Math.random()*Math.PI*2;
    // All cells know every source; each moves toward its nearest source.
    let target=null,best=Infinity;
    for(const s of sources){const d=dist(a,s);if(d<best){best=d;target=s}}
    a.known=target?{x:target.x,y:target.y,version:sourceVersion,ttl:999}:null;
-   if(target&&best>25+target.power*.1){
+   const hunt=orders.get(a.id);
+   a.huntingTarget=hunt?.victim.id??null;
+   if(hunt&&cells.includes(hunt.victim)){
+     const orbit=radius(a)+radius(hunt.victim)+3;
+     const tx=hunt.victim.x+Math.cos(hunt.angle)*orbit,ty=hunt.victim.y+Math.sin(hunt.angle)*orbit;
+     const desired=Math.atan2(ty-a.y,tx-a.x);
+     a.heading+=Math.atan2(Math.sin(desired-a.heading),Math.cos(desired-a.heading))*.55;
+   }else if(target&&best>25+target.power*.1){
      const desired=Math.atan2(target.y-a.y,target.x-a.x);
      const diff=Math.atan2(Math.sin(desired-a.heading),Math.cos(desired-a.heading));
      a.heading+=diff*.38+(Math.random()-.5)*.12;
