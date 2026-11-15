@@ -20,7 +20,7 @@ const img=draw.skinCtx.createImageData(sw,sh),pix=img.data;
 const cp=project(cell.p),centerX=cp.x*density,centerY=cp.y*density;
 const target=cell.target||cell.wander,sp=project(target);
 const heading=Math.atan2((sp.y-cp.y),(sp.x-cp.x));
-const elong=1+cell.stretch*1.35,base=clamp(Math.min(w,h)*.00255*zoom*density*11.5,4.2,12)*Math.sqrt(cell.mass);
+const elong=1+cell.stretch*6.5,base=clamp(Math.min(w,h)*.00255*zoom*density*11.5,4.2,12)*Math.sqrt(cell.mass);
 const major=base*Math.sqrt(elong),minor=base/Math.sqrt(elong),ca=Math.cos(heading),sa=Math.sin(heading);
 for(let y=0;y<sh;y++)for(let x=0;x<sw;x++){
  const xx=x-centerX,yy=y-centerY,u=(xx*ca+yy*sa)/major,v=(-xx*sa+yy*ca)/minor;
@@ -42,11 +42,11 @@ function step(dt){
  const target=nearest?nearest.p:cell.wander;cell.target=target;
  const dx=target.x-cell.p.x,dy=target.y-cell.p.y,dz=target.z-cell.p.z,d=Math.hypot(dx,dy,dz)||1;
  // Gradual deformation of the entire body, never an independently advancing arm.
- const desired=nearest?clamp(d/65,.22,1):.13;
- cell.stretch+=(desired-cell.stretch)*Math.min(1,dt*.34);
- const speed=(nearest?3.2:1.65)*(1-.55*cell.starve);
+ const desired=nearest?clamp(d/42,.55,1):.08;
+ cell.stretch+=(desired-cell.stretch)*Math.min(1,dt*1.25);
+ const speed=(nearest?7.2:1.65)*(1-.55*cell.starve);
  cell.p.x=clamp(cell.p.x+dx/d*speed*dt,-85,85);cell.p.y=clamp(cell.p.y+dy/d*speed*dt,-85,85);cell.p.z=clamp(cell.p.z+dz/d*speed*dt,-85,85);
- if(nearest&&dist(cell.p,nearest.p)<14){
+ if(nearest&&dist(cell.p,nearest.p)<(11.5*Math.sqrt(1+cell.stretch*6.5)+3)){
   const absorbed=Math.min(nearest.energy,dt*5);nearest.energy-=absorbed;cell.energy=clamp(cell.energy+absorbed,0,100);
   if(nearest.energy<=.001){sources.splice(sources.indexOf(nearest),1);cell.found++;cell.experience++;cell.memory.push({...nearest.p});cell.mass=Math.min(1.65,cell.mass+.035);cell.size=Math.sqrt(cell.mass);requestTime=cell.age+7;say('Я поглотила энергию, немного пополнела и продолжаю медленно исследовать мир.')}
  }
