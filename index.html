@@ -9,7 +9,7 @@
 <div class="stats"><div class="stat">Клеток<b id="count">10</b></div><div class="stat">День<b id="day">0</b></div><div class="stat">Источников<b id="sources">0</b></div><div class="stat">Погибло<b id="dead">0</b></div></div>
 <div class="tools"><button id="add">➕ 10 клеток</button><button id="energy">⚡ Случайная энергия</button><button id="walls">🧱 Поставить стены</button><button id="pause">⏸ Пауза</button><button id="reset">↻ Новый мир</button></div>
 <div class="chat"><span id="speech">💬 Клетки пока молчат…</span><button id="yes" hidden>Да</button><button id="no" hidden>Нет</button></div>
-<section aria-label="Эволюция десяти видов"><div class="evolution-gallery" id="evolutionGallery"></div></section><div class="scene" id="scene"><div class="hint">Пальцем вращать · двумя пальцами приближать · касание клетки — наблюдать</div></div>
+<section aria-label="Эволюция десяти видов"><div style="font-weight:700;margin:12px 0 7px">🧬 Эволюция видов — 10 окон</div><div class="evolution-gallery" id="evolutionGallery"><button type="button" class="evo-card" data-kind="0"><svg viewBox="0 0 100 90" aria-hidden="true"><circle cx="50" cy="43" r="25" fill="#ff676b"/></svg><span class="evo-name">1. Разведчики</span><small>Ожидание</small></button><button type="button" class="evo-card" data-kind="1"><svg viewBox="0 0 100 90" aria-hidden="true"><circle cx="50" cy="43" r="25" fill="#63baff"/></svg><span class="evo-name">2. Стражи</span><small>Ожидание</small></button><button type="button" class="evo-card" data-kind="2"><svg viewBox="0 0 100 90" aria-hidden="true"><circle cx="50" cy="43" r="25" fill="#ffd166"/></svg><span class="evo-name">3. Стратеги</span><small>Ожидание</small></button><button type="button" class="evo-card" data-kind="3"><svg viewBox="0 0 100 90" aria-hidden="true"><circle cx="50" cy="43" r="25" fill="#74e2a0"/></svg><span class="evo-name">4. Собиратели</span><small>Ожидание</small></button><button type="button" class="evo-card" data-kind="4"><svg viewBox="0 0 100 90" aria-hidden="true"><circle cx="50" cy="43" r="25" fill="#c6a0ff"/></svg><span class="evo-name">5. Адаптеры</span><small>Ожидание</small></button><button type="button" class="evo-card" data-kind="5"><svg viewBox="0 0 100 90" aria-hidden="true"><circle cx="50" cy="43" r="25" fill="#ff94d0"/></svg><span class="evo-name">6. Охотники</span><small>Ожидание</small></button><button type="button" class="evo-card" data-kind="6"><svg viewBox="0 0 100 90" aria-hidden="true"><circle cx="50" cy="43" r="25" fill="#61ded7"/></svg><span class="evo-name">7. Исследователи</span><small>Ожидание</small></button><button type="button" class="evo-card" data-kind="7"><svg viewBox="0 0 100 90" aria-hidden="true"><circle cx="50" cy="43" r="25" fill="#ffa15e"/></svg><span class="evo-name">8. Скороходы</span><small>Ожидание</small></button><button type="button" class="evo-card" data-kind="8"><svg viewBox="0 0 100 90" aria-hidden="true"><circle cx="50" cy="43" r="25" fill="#b6d86b"/></svg><span class="evo-name">9. Защитники</span><small>Ожидание</small></button><button type="button" class="evo-card" data-kind="9"><svg viewBox="0 0 100 90" aria-hidden="true"><circle cx="50" cy="43" r="25" fill="#b8becd"/></svg><span class="evo-name">10. Кооператоры</span><small>Ожидание</small></button></div></section><div class="scene" id="scene"><div class="hint">Пальцем вращать · двумя пальцами приближать · касание клетки — наблюдать</div></div>
 <div class="tools"><button id="overview">◈ Весь куб</button><button id="follow">◎ Следить за клеткой</button><button id="xray">◉ Рентген: выкл.</button><button id="events">✦ События: вкл.</button></div>
 <div class="columns"><section class="panel"><b>Виды и потери</b><div id="species"></div></section><section class="panel"><b>Выбранная клетка</b><pre id="detail">Коснитесь клетки в кубе</pre><small>Питание, знания и мутации расходуют общий запас энергии. У каждой клетки собственные решения.</small></section></div>
 <section class="panel"><b>Журнал эволюции</b><div id="log"><small>Мир создан. Источников энергии пока нет.</small></div></section>
@@ -66,14 +66,12 @@ function updateShape(a){
 }
 const evoCards=[];
 function buildEvolutionGallery(){
- const gallery=$('evolutionGallery');gallery.replaceChildren();
+ const gallery=$('evolutionGallery');
  for(let i=0;i<10;i++){
-  const button=document.createElement('button');button.type='button';button.className='evo-card';
-  button.setAttribute('aria-label','Наблюдать вид '+(i+1));
-  button.innerHTML='<svg viewBox="0 0 100 90" aria-hidden="true"></svg><span class="evo-name"></span><small></small>';
-  button.querySelector('.evo-name').textContent=(i+1)+'. '+NAMES[i];
+  const button=gallery.querySelector('[data-kind="'+i+'"]');
+  if(!button)continue;
   button.onclick=()=>{const candidates=cells.filter(a=>a.kind===i);if(candidates.length){selected=candidates.reduce((a,b)=>a.genes>=b.genes?a:b);follow=true;updateUI()}};
-  gallery.append(button);evoCards.push(button);
+  evoCards.push(button);
  }
 }
 function drawEvolutionGallery(){
