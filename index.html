@@ -2,14 +2,14 @@
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mycelium Life 3D — куб эволюции</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#07131c;color:#e8f5f4;font:14px system-ui}main{max-width:1100px;margin:auto;padding:12px}h1{font-size:22px;margin:8px 0}p{line-height:1.45;color:#b6cdd2}button,select{background:#185c66;color:#fff;border:1px solid #397783;border-radius:9px;padding:10px;font-weight:650;cursor:pointer}button:disabled{opacity:.45}.tools{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}.tools button{flex:1;min-width:130px}.chat{display:flex;align-items:center;gap:7px;background:#142d3a;border-radius:9px;padding:9px;margin:8px 0}.chat span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat button{padding:6px 11px}.scene{height:min(67vh,650px);min-height:340px;position:relative;border:1px solid #295467;border-radius:14px;overflow:hidden;background:radial-gradient(ellipse at center,#103445,#06121b)}.scene canvas{display:block;width:100%;height:100%;touch-action:none}.hint{position:absolute;bottom:8px;left:10px;font-size:12px;color:#a9c9d0;pointer-events:none}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:10px 0}.stat{background:#142d3a;border-radius:9px;padding:9px}.stat b{display:block;font-size:20px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:10px}.panel{background:#142d3a;padding:12px;border-radius:10px;margin-top:10px}.species{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:9px;border-bottom:1px solid #264554;padding:6px 0;font-size:12px}.dot{height:11px;width:11px;border-radius:50%}small{color:#b5ced0}pre{white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;font-size:12px}.badge{display:inline-block;border-radius:6px;background:#244b57;padding:3px 6px;margin:2px}label{display:block;margin:8px 0}input[type=checkbox]{accent-color:#5dc7b3}@media(max-width:650px){.columns{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.scene{height:55vh;min-height:300px}.tools button{min-width:100px;font-size:12px}}
+*{box-sizing:border-box}body{margin:0;background:#07131c;color:#e8f5f4;font:14px system-ui}main{max-width:1100px;margin:auto;padding:12px}h1{font-size:22px;margin:8px 0}p{line-height:1.45;color:#b6cdd2}button,select{background:#185c66;color:#fff;border:1px solid #397783;border-radius:9px;padding:10px;font-weight:650;cursor:pointer}button:disabled{opacity:.45}.tools{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}.tools button{flex:1;min-width:130px}.chat{display:flex;align-items:center;gap:7px;background:#142d3a;border-radius:9px;padding:9px;margin:8px 0}.chat span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat button{padding:6px 11px}.evolution-gallery{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:9px 0}.evo-card{background:#142d3a;border:1px solid #295467;border-radius:10px;min-width:0;padding:6px 3px;text-align:center;color:#e8f5f4;cursor:pointer}.evo-card svg{display:block;width:100%;height:73px}.evo-card .evo-name{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.evo-card small{font-size:10px}.evo-card.active{border-color:#e4f5ff}.evo-card.extinct{opacity:.45}@media(max-width:650px){.evolution-gallery{grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}.evo-card svg{height:62px}.evo-card{padding:5px 2px}}.scene{height:min(67vh,650px);min-height:340px;position:relative;border:1px solid #295467;border-radius:14px;overflow:hidden;background:radial-gradient(ellipse at center,#103445,#06121b)}.scene canvas{display:block;width:100%;height:100%;touch-action:none}.hint{position:absolute;bottom:8px;left:10px;font-size:12px;color:#a9c9d0;pointer-events:none}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:10px 0}.stat{background:#142d3a;border-radius:9px;padding:9px}.stat b{display:block;font-size:20px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:10px}.panel{background:#142d3a;padding:12px;border-radius:10px;margin-top:10px}.species{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:9px;border-bottom:1px solid #264554;padding:6px 0;font-size:12px}.dot{height:11px;width:11px;border-radius:50%}small{color:#b5ced0}pre{white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;font-size:12px}.badge{display:inline-block;border-radius:6px;background:#244b57;padding:3px 6px;margin:2px}label{display:block;margin:8px 0}input[type=checkbox]{accent-color:#5dc7b3}@media(max-width:650px){.columns{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.scene{height:55vh;min-height:300px}.tools button{min-width:100px;font-size:12px}}
 </style></head><body><main>
 <h1>🧬 Mycelium Life 3D — куб эволюции</h1>
 <p>10 цветовых видов · свободный полёт в объёме · энергия = знания · самостоятельные решения · ограничение характеристик ×5</p>
 <div class="stats"><div class="stat">Клеток<b id="count">10</b></div><div class="stat">День<b id="day">0</b></div><div class="stat">Источников<b id="sources">0</b></div><div class="stat">Погибло<b id="dead">0</b></div></div>
 <div class="tools"><button id="add">➕ 10 клеток</button><button id="energy">⚡ Случайная энергия</button><button id="walls">🧱 Поставить стены</button><button id="pause">⏸ Пауза</button><button id="reset">↻ Новый мир</button></div>
 <div class="chat"><span id="speech">💬 Клетки пока молчат…</span><button id="yes" hidden>Да</button><button id="no" hidden>Нет</button></div>
-<div class="scene" id="scene"><div class="hint">Пальцем вращать · двумя пальцами приближать · касание клетки — наблюдать</div></div>
+<section aria-label="Эволюция десяти видов"><div class="evolution-gallery" id="evolutionGallery"></div></section><div class="scene" id="scene"><div class="hint">Пальцем вращать · двумя пальцами приближать · касание клетки — наблюдать</div></div>
 <div class="tools"><button id="overview">◈ Весь куб</button><button id="follow">◎ Следить за клеткой</button><button id="xray">◉ Рентген: выкл.</button><button id="events">✦ События: вкл.</button></div>
 <div class="columns"><section class="panel"><b>Виды и потери</b><div id="species"></div></section><section class="panel"><b>Выбранная клетка</b><pre id="detail">Коснитесь клетки в кубе</pre><small>Питание, знания и мутации расходуют общий запас энергии. У каждой клетки собственные решения.</small></section></div>
 <section class="panel"><b>Журнал эволюции</b><div id="log"><small>Мир создан. Источников энергии пока нет.</small></div></section>
@@ -55,18 +55,46 @@ const makeMat=(c,opacity=1)=>new T.MeshPhongMaterial({color:c,emissive:c,emissiv
 function event(s){const p=document.createElement('div');p.textContent='День '+day.toFixed(1)+' · '+s;$('log').prepend(p);while($('log').children.length>9)$('log').lastChild.remove()}
 function traits(i){const v={speed:1,armor:1,sensing:1,efficiency:1,learning:1,attack:1,cooperation:1};v[KEYS[i]]=1.3;return v}
 function addCell(kind,pos,parent){
- const geometry=kind%3===0?new T.IcosahedronGeometry(1,1):kind%3===1?new T.SphereGeometry(1,12,9):cellGeo;const mesh=new T.Mesh(geometry,makeMat(COLORS[kind]));mesh.scale.set(kind%3===2?3.9:3.5,kind%3===1?2.8:3.5,kind%3===0?3.9:3.5);mesh.position.copy(pos||randPos());scene.add(mesh);
+ const mesh=new T.Mesh(cellGeo,makeMat(COLORS[kind]));mesh.scale.setScalar(1.8);mesh.position.copy(pos||randPos());scene.add(mesh);
  const a={id:nextId++,kind,mesh,energy:parent?Math.max(5,parent.energy*.4):11,age:0,life:parent?parent.life:180,traits:parent?{...parent.traits}:traits(kind),fed:new Set(),experience:parent?parent.experience*.3:0,genes:parent?parent.genes:0,adaptation:parent?parent.adaptation:KEYS[kind],arm:parent?parent.arm:false,shell:parent?parent.shell:false,knowledge:parent?[...parent.knowledge]:[],target:null,velocity:new T.Vector3(rnd(-1,1),rnd(-1,1),rnd(-1,1)).normalize(),goal:'исследование',asked:false,attackCooldown:0};
  mesh.userData.cell=a;cells.push(a);updateShape(a);return a
 }
 function updateShape(a){
- const m=a.mesh;
- if(a.shell&&!m.userData.shell){const armor=new T.Mesh(new T.IcosahedronGeometry(1.18,1),new T.MeshPhongMaterial({color:COLORS[a.kind],wireframe:true,transparent:true,opacity:.35,depthWrite:false}));m.add(armor);m.userData.shell=armor}
- if(!a.shell&&m.userData.shell){m.remove(m.userData.shell);m.userData.shell.geometry.dispose();m.userData.shell.material.dispose();delete m.userData.shell}
- if(a.arm&&!m.userData.arm){const arm=new T.Mesh(new T.CylinderGeometry(.08,.14,1.45,7),makeMat(COLORS[a.kind]));arm.rotation.z=Math.PI/2;arm.position.x=1.28;m.add(arm);m.userData.arm=arm}
- if(!a.arm&&m.userData.arm){m.remove(m.userData.arm);m.userData.arm.geometry.dispose();m.userData.arm.material.dispose();delete m.userData.arm}
+ // Evolution remains in the cell's genes; the cube shows only lightweight colored dots.
+ a.mesh.material.color.set(COLORS[a.kind]);
+ a.mesh.material.emissive.set(COLORS[a.kind]);
 }
-function removeCell(a){scene.remove(a.mesh);a.mesh.traverse(o=>{if(o.geometry&&o!==a.mesh)o.geometry.dispose();if(o.material)o.material.dispose()});cells.splice(cells.indexOf(a),1);if(selected===a){selected=null;follow=false}stats[a.kind].dead++;dead++}
+const evoCards=[];
+function buildEvolutionGallery(){
+ const gallery=$('evolutionGallery');gallery.replaceChildren();
+ for(let i=0;i<10;i++){
+  const button=document.createElement('button');button.type='button';button.className='evo-card';
+  button.setAttribute('aria-label','Наблюдать вид '+(i+1));
+  button.innerHTML='<svg viewBox="0 0 100 90" aria-hidden="true"></svg><span class="evo-name"></span><small></small>';
+  button.querySelector('.evo-name').textContent=(i+1)+'. '+NAMES[i];
+  button.onclick=()=>{const candidates=cells.filter(a=>a.kind===i);if(candidates.length){selected=candidates.reduce((a,b)=>a.genes>=b.genes?a:b);follow=true;updateUI()}};
+  gallery.append(button);evoCards.push(button);
+ }
+}
+function drawEvolutionGallery(){
+ const best=Array(10).fill(null),counts=Array(10).fill(0);
+ for(const a of cells){counts[a.kind]++;if(!best[a.kind]||a.genes>best[a.kind].genes)best[a.kind]=a}
+ for(let i=0;i<10;i++){
+  const card=evoCards[i],a=best[i],color=COLORS[i];if(!card)continue;
+  card.classList.toggle('extinct',!a);card.classList.toggle('active',!!a&&selected?.kind===i);
+  const armor=a?.traits.armor||1,attack=a?.traits.attack||1,speed=a?.traits.speed||1;
+  const shell=a?.shell,arm=a?.arm;
+  const points=Math.min(8,Math.max(0,Math.floor((attack-1)*2)));
+  const spikes=Array.from({length:points},(_,k)=>{const angle=2*Math.PI*k/points;const x=50+Math.cos(angle)*30,y=43+Math.sin(angle)*30;const x2=50+Math.cos(angle)*41,y2=43+Math.sin(angle)*41;return '<line x1="'+x+'" y1="'+y+'" x2="'+x2+'" y2="'+y2+'" stroke="'+color+'" stroke-width="3" stroke-linecap="round"/>'}).join('');
+  const limb=arm?'<path d="M 70 43 Q 86 30 89 16 M 70 43 Q 87 53 93 61" stroke="'+color+'" stroke-width="5" stroke-linecap="round" fill="none"/>':'';
+  const armorSvg=shell?'<circle cx="50" cy="43" r="'+(30+Math.min(5,armor))+'" stroke="'+color+'" stroke-width="5" stroke-dasharray="6 3" fill="none"/>':'';
+  const eyes='<circle cx="42" cy="38" r="3" fill="#07131c"/><circle cx="59" cy="38" r="3" fill="#07131c"/>';
+  const shape=i%3===0?'<polygon points="50,15 72,29 72,57 50,71 28,57 28,29" fill="'+color+'" opacity=".85"/>':i%3===1?'<ellipse cx="50" cy="43" rx="'+(24+Math.min(5,speed))+'" ry="22" fill="'+color+'" opacity=".85"/>':'<circle cx="50" cy="43" r="25" fill="'+color+'" opacity=".85"/>';
+  card.querySelector('svg').innerHTML=spikes+limb+shape+armorSvg+eyes;
+  card.querySelector('small').textContent=a?'Живых '+counts[i]+' · мутаций '+a.genes:'Вид вымер';
+ }
+}
+function removeCell(a){scene.remove(a.mesh);a.mesh.material.dispose();cells.splice(cells.indexOf(a),1);if(selected===a){selected=null;follow=false}stats[a.kind].dead++;dead++}
 function spawnEnergy(){
  const pos=randPos(),mesh=new T.Mesh(srcGeo,new T.MeshPhongMaterial({color:0xffd15a,emissive:0xe5a334,emissiveIntensity:.7}));mesh.position.copy(pos);scene.add(mesh);
  const s={id:Date.now()+Math.random(),pos,mesh,units:20};sources.push(s);worldStarted=true;event('Источник энергии появился в случайной точке куба (20 порций)');return s
@@ -77,7 +105,7 @@ function addWall(){
 }
 function removeWalls(){walls.forEach(m=>{scene.remove(m);m.geometry.dispose();m.material.dispose()});walls=[]}
 function reset(){
- cells.forEach(a=>{scene.remove(a.mesh);a.mesh.traverse(o=>{if(o.material)o.material.dispose()})});cells=[];sources.forEach(s=>{scene.remove(s.mesh);s.mesh.material.dispose()});sources=[];removeWalls();nextId=1;day=0;dead=0;worldStarted=false;pending=null;selected=null;follow=false;lastAsk=-100;askedId=0;stats.forEach(s=>{s.dead=0;s.conversions=0});$('speech').textContent='💬 Клетки пока молчат…';$('yes').hidden=$('no').hidden=true;$('log').textContent='';for(let i=0;i<10;i++)addCell(i);event('Созданы 10 видов с разными стартовыми преимуществами. Время остановлено до первого источника энергии');running=true;$('pause').textContent='⏸ Пауза'
+ cells.forEach(a=>{scene.remove(a.mesh);a.mesh.material.dispose()});cells=[];sources.forEach(s=>{scene.remove(s.mesh);s.mesh.material.dispose()});sources=[];removeWalls();nextId=1;day=0;dead=0;worldStarted=false;pending=null;selected=null;follow=false;lastAsk=-100;askedId=0;stats.forEach(s=>{s.dead=0;s.conversions=0});$('speech').textContent='💬 Клетки пока молчат…';$('yes').hidden=$('no').hidden=true;$('log').textContent='';for(let i=0;i<10;i++)addCell(i);event('Созданы 10 видов с разными стартовыми преимуществами. Время остановлено до первого источника энергии');running=true;$('pause').textContent='⏸ Пауза'
 }
 function chooseTarget(a){
  let best=null,score=-Infinity;
@@ -143,6 +171,7 @@ $('follow').onclick=()=>{if(selected)follow=!follow;else event('Для слеж�
 $('xray').onclick=()=>{xray=!xray;for(const a of cells){a.mesh.material.depthTest=!xray;a.mesh.material.transparent=xray;a.mesh.material.opacity=xray?.82:1}for(const w of walls)w.material.opacity=xray?.08:.34;$('xray').textContent='◉ Рентген: '+(xray?'вкл.':'выкл.')};
 $('events').onclick=()=>{autoEvents=!autoEvents;$('events').textContent='✦ События: '+(autoEvents?'вкл.':'выкл.')};
 function updateUI(){
+ drawEvolutionGallery();
  $('count').textContent=cells.length;$('day').textContent=day.toFixed(1);$('sources').textContent=sources.length;$('dead').textContent=dead;
  const counts=Array(10).fill(0);for(const a of cells)counts[a.kind]++;
  $('species').replaceChildren(...COLORS.map((c,i)=>{const d=document.createElement('div');d.className='species';const sw=document.createElement('i');sw.className='dot';sw.style.background=c;const name=document.createElement('span');name.textContent=(i+1)+'. '+NAMES[i]+' · живых '+counts[i];const value=document.createElement('span');value.textContent='☠ '+stats[i].dead+' · ⇄ '+stats[i].conversions;d.append(sw,name,value);return d}));
@@ -158,7 +187,7 @@ renderer.domElement.addEventListener('pointerup',e=>{if(!drag)return;const moved
 renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();orbit.dist=clamp(orbit.dist*Math.exp(e.deltaY*.001),.4,4)},{passive:false});
 let pinch=0;renderer.domElement.addEventListener('touchmove',e=>{if(e.touches.length===2){const a=e.touches[0],b=e.touches[1],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(pinch)orbit.dist=clamp(orbit.dist*pinch/d,.4,4);pinch=d}},{passive:true});renderer.domElement.addEventListener('touchend',()=>pinch=0);
 function frame(now){requestAnimationFrame(frame);if(now-last<32)return;const dt=Math.min(.05,(now-last)/1000);last=now;if(running&&cells.length)tick(dt*.85);if(follow&&(!selected||!cells.includes(selected)))follow=false;setCamera();renderer.render(scene,camera);if(frameN++%45===0)updateUI()}
-reset();orbit.dist=fitCubeDistance();requestAnimationFrame(frame);
+buildEvolutionGallery();reset();orbit.dist=fitCubeDistance();requestAnimationFrame(frame);
 })();
 bootStatus.textContent='✓ 3D работает — клетки созданы';
 setTimeout(()=>{if(bootStatus.textContent.startsWith('✓'))bootStatus.remove()},4000);
