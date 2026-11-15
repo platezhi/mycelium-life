@@ -17,7 +17,7 @@ for(const source of sources){const s=project(source.p),r=4+Math.sqrt(source.ener
 const radius=(13+cell.size*2.8)*zoom;
 const segments=branches.map(b=>({a:project(b.origin),b:project(b.tip),id:b.id}));
 const root=project(cell.p);
-const density=Math.min(1,310/Math.max(w,h)),sw=Math.max(1,Math.ceil(w*density)),sh=Math.max(1,Math.ceil(h*density));
+const density=Math.min(1,220/Math.max(w,h)),sw=Math.max(1,Math.ceil(w*density)),sh=Math.max(1,Math.ceil(h*density));
 if(!draw.skin||draw.skin.width!==sw||draw.skin.height!==sh){draw.skin=document.createElement('canvas');draw.skin.width=sw;draw.skin.height=sh;draw.skinCtx=draw.skin.getContext('2d')}
 const image=draw.skinCtx.createImageData(sw,sh),pixels=image.data;
 const r=radius*density,softness=Math.max(4,r*.85),fade=clamp(cell.energy/65,0,1);
