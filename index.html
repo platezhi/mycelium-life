@@ -14,8 +14,7 @@
 <div class="columns"><section class="panel"><b>Виды и потери</b><div id="species"></div></section><section class="panel"><b>Выбранная клетка</b><pre id="detail">Коснитесь клетки в кубе</pre><small>Питание, знания и мутации расходуют общий запас энергии. У каждой клетки собственные решения.</small></section></div>
 <section class="panel"><b>Журнал эволюции</b><div id="log"><small>Мир создан. Источников энергии пока нет.</small></div></section>
 <p><small>Встроенная библиотека содержит упрощённые идеи биологии и стратегии. Прямого подключения к интернету или ИИ-модели у клеток пока нет: новые решения возникают из правил симуляции и их опыта.</small></p>
-</main><script src="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js"></script>
-<script>
+</main><script type="module">\nimport * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js";
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id);
@@ -24,7 +23,7 @@ const NAMES=['Разведчики','Стражи','Стратеги','Соби�
 const KEYS=['speed','armor','sensing','efficiency','learning','attack','learning','speed','armor','cooperation'];
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),rnd=(a,b)=>a+Math.random()*(b-a);
 const sceneEl=$('scene');
-if(!window.THREE){sceneEl.innerHTML='<p style="padding:25px">Не удалось загрузить Three.js. Проверьте подключение к интернету и обновите страницу.</p>';return}
+
 const T=THREE,scene=new T.Scene(),camera=new T.PerspectiveCamera(55,1,.1,1200);
 const renderer=new T.WebGLRenderer({antialias:true,alpha:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));sceneEl.prepend(renderer.domElement);
