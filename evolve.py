@@ -46,7 +46,7 @@ def main():
     s['supply_percent']=config['supply_percent']
     try: prev=datetime.datetime.fromisoformat(s['updated'])
     except ValueError:prev=NOW
-    elapsed=max(0,(NOW-prev).total_seconds()/180) # 3 real minutes = 1 simulated day
+    elapsed=max(0,(NOW-prev).total_seconds()/600) # 10 real minutes = 1 simulated day; 7 days = 70 minutes
     r=random.Random()
     # Time advances from wall-clock elapsed time, even if Actions runs late.
     remaining=elapsed
