@@ -15,7 +15,22 @@
 <section class="panel"><b>Журнал эволюции</b><div id="log"><small>Мир создан. Источников энергии пока нет.</small></div></section>
 <p><small>Встроенная библиотека содержит упрощённые идеи биологии и стратегии. Прямого подключения к интернету или ИИ-модели у клеток пока нет: новые решения возникают из правил симуляции и их опыта.</small></p>
 </main><script type="module">
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js";
+let THREE;
+const bootStatus=document.createElement('div');
+bootStatus.id='bootStatus';
+bootStatus.style.cssText='padding:12px;margin:8px 0;background:#2b3b42;color:#fff;border-radius:8px';
+bootStatus.textContent='⏳ Загрузка 3D-движка…';
+document.getElementById('scene').before(bootStatus);
+try {
+ try {THREE=await import('https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js')}
+ catch(firstError) {THREE=await import('https://unpkg.com/three@0.160.1/build/three.module.js')}
+ bootStatus.textContent='✓ 3D-движок загружен, создаём клетки…';
+} catch(error) {
+ bootStatus.textContent='❌ Не удалось загрузить 3D-движок: '+error.message+'. Проверьте доступ к CDN.';
+}
+window.addEventListener('error',e=>{bootStatus.textContent='❌ Ошибка 3D: '+e.message});
+window.addEventListener('unhandledrejection',e=>{bootStatus.textContent='❌ Ошибка 3D: '+String(e.reason)});
+if(THREE) try {
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id);
@@ -143,4 +158,7 @@ let pinch=0;renderer.domElement.addEventListener('touchmove',e=>{if(e.touches.le
 function frame(now){requestAnimationFrame(frame);const dt=Math.min(.045,(now-last)/1000);last=now;if(running&&cells.length)tick(dt*.85);if(follow&&(!selected||!cells.includes(selected)))follow=false;setCamera();renderer.render(scene,camera);if(frameN++%16===0)updateUI()}
 reset();requestAnimationFrame(frame);
 })();
+bootStatus.textContent='✓ 3D работает — клетки созданы';
+setTimeout(()=>{if(bootStatus.textContent.startsWith('✓'))bootStatus.remove()},4000);
+} catch(error) {bootStatus.textContent='❌ Ошибка запуска 3D: '+error.message;console.error(error)}
 </script></body></html>
