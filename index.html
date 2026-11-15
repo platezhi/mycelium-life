@@ -1,5 +1,5 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mycelium Life — поиск энергии</title><style>
-*{box-sizing:border-box}body{margin:0;background:#071a23;color:#e3f4ec;font:15px system-ui}main{max-width:860px;margin:auto;padding:16px}h1{font-size:25px}canvas{width:100%;height:auto;background:#0b2931;border-radius:14px;display:block;touch-action:manipulation}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.stat{padding:12px;background:#16323a;border-radius:10px}.stat strong{display:block;font-size:21px}button{background:#27816c;color:white;border:0;padding:12px 16px;border-radius:9px;font-weight:600}small{color:#b2c9c3}pre{white-space:pre-wrap;word-break:break-word;background:#16323a;padding:12px;border-radius:9px}a{color:#91e5ce}input{width:100%;accent-color:#62d6a4}.controls{background:#16323a;padding:15px;border-radius:12px;margin:12px 0}.muted{color:#b2c9c3}</style></head><body><main><h1>Мицелий — поиск энергии</h1><p>наследование цвета и скорости · препятствия · столкновения поколений</p><div class="stats"><div class="stat">Клеток<strong id="count">—</strong></div><div class="stat">Вирт. суток<strong id="day">—</strong></div><div class="stat">Родилось / погибло<strong id="events">—</strong></div></div><canvas id="world" width="760" height="520"></canvas><div class="controls"><b>Эксперимент: источник энергии</b><p>Каждое касание поля добавляет новый источник, даже поверх клеток. Каждый источник содержит ровно 30 порций. Каждая подпитка расходует одну порцию; повторная подпитка той же клетки возможна через 0,25 виртуальных суток. Затем источник исчезает. Все клетки узнают об исчезновении. Красная кнопка отключает все источники. Касание клетки показывает её состояние.</p><label for="power">Мощность источника: <strong id="powerValue">100%</strong></label><input id="power" type="range" min="0" max="300" step="10" value="100"><p><strong id="sourceCount">Источников: 0</strong></p><p><button id="inspectMode">Режим: добавление источников</button></p><p><button id="removeSource" style="background:#bd3548;width:100%;font-size:17px;padding:17px">⛔ ОСТАНОВИТЬ ПОДАЧУ ЭНЕРГИИ</button></p><p><button id="restart">Добавить 100 клеток</button></p><p><button id="start">Начать локальную симуляцию</button> <button id="pause">Пауза</button></p><small id="mode">Сначала загружается состояние из GitHub. Эксперимент в браузере не записывается в GitHub.</small></div><details class="controls" open><summary><b>⚙️ Условия жизни — шкалы</b></summary><p>Параметры локальной симуляции. Сохраняются на этом устройстве.</p><div id="sliders"></div><button id="resetRules">Сбросить настройки</button></details><p><button id="refresh">Загрузить состояние GitHub</button> <small id="updated"></small></p><h3>Клетка</h3><pre id="detail">Клетка не выбрана</pre><small>В браузерном эксперименте время ускорено: около 1 виртуальных суток за 1 реальную секунду. В сохранённом расчёте GitHub 1 виртуальные сутки = 10 реальных минут. Цвет обозначает родословную: потомки наследуют цвет родителя. Скорость зависит от числа разных источников, от которых клетка питалась (1 — ×1, 2 — ×2, 3 — ×3), и наследуется потомками. Старение и расход энергии замедлены в 50 раз; накопление прогресса деления ускорено в 2 раза. Питание от нового источника повышает наследуемую скорость. Питание пополняет энергию и жизненный ресурс. После первого питания клетка становится вдвое крупнее. Стены нужно обходить; старшие по хронологическому возрасту клетки отталкивают младших. Когда клеток больше, чем оставшихся порций питания, группы по пять клеток одного цвета закрепляют состав команды и выбранную жертву, занимают позиции вокруг неё и уничтожают при успешном окружении. У источников старшие клетки отталкивают младших. Движение, старение и размножение настраиваются шкалами. GitHub Actions ведёт отдельный сохранённый расчёт. Это модель, а не доказательство возникновения жизни.</small></main><script>
+*{box-sizing:border-box}body{margin:0;background:#071a23;color:#e3f4ec;font:15px system-ui}main{max-width:860px;margin:auto;padding:16px}h1{font-size:25px}canvas{width:100%;height:auto;background:#0b2931;border-radius:14px;display:block;touch-action:manipulation}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.stat{padding:12px;background:#16323a;border-radius:10px}.stat strong{display:block;font-size:21px}button{background:#27816c;color:white;border:0;padding:12px 16px;border-radius:9px;font-weight:600}small{color:#b2c9c3}pre{white-space:pre-wrap;word-break:break-word;background:#16323a;padding:12px;border-radius:9px}a{color:#91e5ce}input{width:100%;accent-color:#62d6a4}.controls{background:#16323a;padding:15px;border-radius:12px;margin:12px 0}.muted{color:#b2c9c3}</style></head><body><main><h1>Мицелий — поиск энергии</h1><p>наследование цвета и скорости · препятствия · столкновения поколений</p><div class="stats"><div class="stat">Клеток<strong id="count">—</strong></div><div class="stat">Вирт. суток<strong id="day">—</strong></div><div class="stat">Родилось / погибло<strong id="events">—</strong></div></div><canvas id="world" width="760" height="520"></canvas><div class="controls"><b>Эксперимент: источник энергии</b><p>Каждое касание поля добавляет новый источник, даже поверх клеток. Каждый источник содержит ровно 30 порций. Каждая подпитка расходует одну порцию; повторная подпитка той же клетки возможна через 0,25 виртуальных суток. Затем источник исчезает. Все клетки узнают об исчезновении. Красная кнопка отключает все источники. Касание клетки показывает её состояние.</p><label for="power">Мощность источника: <strong id="powerValue">100%</strong></label><input id="power" type="range" min="0" max="300" step="10" value="100"><p><strong id="sourceCount">Источников: 0</strong></p><p><button id="inspectMode">Режим: добавление источников</button></p><p><button id="removeSource" style="background:#bd3548;width:100%;font-size:17px;padding:17px">⛔ ОСТАНОВИТЬ ПОДАЧУ ЭНЕРГИИ</button></p><p><button id="restart">Добавить 100 клеток</button></p><p><button id="start">Начать локальную симуляцию</button> <button id="pause">Пауза</button></p><small id="mode">Сначала загружается состояние из GitHub. Эксперимент в браузере не записывается в GitHub.</small></div><details class="controls" open><summary><b>⚙️ Условия жизни — шкалы</b></summary><p>Параметры локальной симуляции. Сохраняются на этом устройстве.</p><div id="sliders"></div><button id="resetRules">Сбросить настройки</button></details><p><button id="refresh">Загрузить состояние GitHub</button> <small id="updated"></small></p><h3>Клетка</h3><pre id="detail">Клетка не выбрана</pre><small>В браузерном эксперименте время ускорено: около 1 виртуальных суток за 1 реальную секунду. В сохранённом расчёте GitHub 1 виртуальные сутки = 10 реальных минут. Цвет обозначает родословную: потомки наследуют цвет родителя. Скорость зависит от числа разных источников, от которых клетка питалась (1 — ×1, 2 — ×2, 3 — ×3), и наследуется потомками. Старение и расход энергии замедлены в 50 раз; накопление прогресса деления ускорено в 2 раза. Питание от нового источника повышает наследуемую скорость. Питание пополняет энергию и жизненный ресурс. После первого питания клетка становится вдвое крупнее. Пройденная дистанция накапливает опыт навигации: опытные клетки используют кратчайшие пути по сетке с учётом стен, а потомки наследуют половину опыта. Стены нужно обходить; старшие по хронологическому возрасту клетки отталкивают младших. Когда клеток больше, чем оставшихся порций питания, группы по пять клеток одного цвета закрепляют состав команды и выбранную жертву, занимают позиции вокруг неё и уничтожают при успешном окружении. У источников старшие клетки отталкивают младших. Движение, старение и размножение настраиваются шкалами. GitHub Actions ведёт отдельный сохранённый расчёт. Это модель, а не доказательство возникновения жизни.</small></main><script>
 const c=document.getElementById('world'),ctx=c.getContext('2d'),$=id=>document.getElementById(id);let cells=[],sources=[],inspectMode=false,sourceVersion=0,day=0,born=0,dead=0,running=false,last=0,acc=0,nextId=101,firstId=null;
 const definitions=[['life','Продолжительность жизни','сут.',1,30,1,7],['movement','Скорость движения','ед./сут.',0,80,1,23],['aging','Ускорение старения','%',0,100,5,30],['cost','Расход энергии при движении','%',0,50,1,5.5],['sense','Радиус обнаружения','ед.',5,150,5,32],['signal','Дальность сигнала','ед.',5,150,5,40],['repro','Порог размножения','ед.',1,20,.5,3.5],['bonus','Бонус первому','%',0,100,5,10],['tempo','Скорость времени','сут./сек.',.1,5,.1,1]];
 let settings={};try{settings=JSON.parse(localStorage.getItem('mycelium-rules-v1')||'{}')}catch(e){}
@@ -29,6 +29,58 @@ function moveWithWalls(a,dx,dy){
  if(Math.hypot(a.x-oldX-dx,a.y-oldY-dy)>Math.max(1,Math.hypot(dx,dy)*.4)){
    a.heading+=((a.id%2)?1:-1)*(Math.PI/2+(Math.random()-.5)*.5);
  }
+}
+// Navigation memory: experienced travellers learn obstacle-aware shortest routes.
+const NAV=20,NX=38,NY=26;
+let navCache=new Map();
+function navField(s){
+ const cached=navCache.get(s.id);if(cached)return cached;
+ const n=NX*NY,distances=new Float64Array(n);distances.fill(Infinity);
+ const blockedGrid=new Uint8Array(n);
+ for(let y=0;y<NY;y++)for(let x=0;x<NX;x++)blockedGrid[y*NX+x]=blocked(x*NAV+NAV/2,y*NAV+NAV/2,10)?1:0;
+ let sx=clamp(Math.floor(s.x/NAV),0,NX-1),sy=clamp(Math.floor(s.y/NAV),0,NY-1),root=sy*NX+sx;
+ if(blockedGrid[root]){
+  let best=Infinity;for(let i=0;i<n;i++)if(!blockedGrid[i]){
+   const d=Math.hypot((i%NX)*NAV+10-s.x,Math.floor(i/NX)*NAV+10-s.y);
+   if(d<best){best=d;root=i}
+  }
+ }
+ const visited=new Uint8Array(n);distances[root]=0;
+ const directions=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+ for(let k=0;k<n;k++){
+  let at=-1,best=Infinity;
+  for(let i=0;i<n;i++)if(!visited[i]&&distances[i]<best){best=distances[i];at=i}
+  if(at<0)break;visited[at]=1;
+  const x=at%NX,y=Math.floor(at/NX);
+  for(const [dx,dy] of directions){
+   const xx=x+dx,yy=y+dy;if(xx<0||xx>=NX||yy<0||yy>=NY)continue;
+   const to=yy*NX+xx;if(blockedGrid[to])continue;
+   if(dx&&dy&&(blockedGrid[y*NX+xx]||blockedGrid[yy*NX+x]))continue;
+   const d=best+Math.hypot(dx,dy)*NAV;
+   if(d<distances[to])distances[to]=d;
+  }
+ }
+ const field={distances,blockedGrid};navCache.set(s.id,field);return field;
+}
+function experiencedRoute(a){
+ if(!sources.length)return null;
+ let chosen=null,best=Infinity;
+ const x=clamp(Math.floor(a.x/NAV),0,NX-1),y=clamp(Math.floor(a.y/NAV),0,NY-1),idx=y*NX+x;
+ for(const s of sources){
+  const field=navField(s),d=field.distances[idx];
+  if(d<best){best=d;chosen={s,field}}
+ }
+ if(!chosen||!Number.isFinite(best))return null;
+ let waypoint=null,score=best;
+ for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+  if(!dx&&!dy)continue;
+  const xx=x+dx,yy=y+dy;if(xx<0||xx>=NX||yy<0||yy>=NY)continue;
+  const j=yy*NX+xx;
+  if(chosen.field.blockedGrid[j])continue;
+  if(dx&&dy&&(chosen.field.blockedGrid[y*NX+xx]||chosen.field.blockedGrid[yy*NX+x]))continue;
+  if(chosen.field.distances[j]<score-0.1){score=chosen.field.distances[j];waypoint={x:xx*NAV+10,y:yy*NAV+10}}
+ }
+ return {source:chosen.s,waypoint:waypoint||{x:chosen.s.x,y:chosen.s.y}};
 }
 function spawnPoint(){
  for(let i=0;i<100;i++){
@@ -165,6 +217,9 @@ function step(dt){
    // All cells know every source; each moves toward its nearest source.
    let target=null,best=Infinity;
    for(const s of sources){const d=dist(a,s);if(d<best){best=d;target=s}}
+   const expertise=Math.min(1,(a.distanceTravelled||0)/500);
+   const route=expertise>.08?experiencedRoute(a):null;
+   if(route)target=route.source;
    a.known=target?{x:target.x,y:target.y,version:sourceVersion,ttl:999}:null;
    const hunt=orders.get(a.id);
    a.huntingTarget=hunt?.victim.id??null;
@@ -174,8 +229,9 @@ function step(dt){
      const desired=Math.atan2(ty-a.y,tx-a.x);
      a.heading+=Math.atan2(Math.sin(desired-a.heading),Math.cos(desired-a.heading))*.8;
      if(Math.hypot(tx-a.x,ty-a.y)<6){a.stuckUntil=Math.max(a.stuckUntil||0,day+.12)}
-   }else if(target&&best>25+target.power*.1){
-     const desired=Math.atan2(target.y-a.y,target.x-a.x);
+   }else if(target&&dist(a,target)>25+target.power*.1){
+     const aim=route&&Math.random()<expertise?route.waypoint:target;
+     const desired=Math.atan2(aim.y-a.y,aim.x-a.x);
      const diff=Math.atan2(Math.sin(desired-a.heading),Math.cos(desired-a.heading));
      a.heading+=diff*.38+(Math.random()-.5)*.12;
    }else if(target){a.heading+=(Math.random()-.5)*1.0}
@@ -192,7 +248,9 @@ function step(dt){
      a.heading=freeLeft&&!freeRight?left:freeRight&&!freeLeft?right:a.heading+((a.id%2)?1:-1)*Math.PI/2;
    }
    if(day>=(a.stuckUntil||0))moveWithWalls(a,Math.cos(a.heading)*speed*dt,Math.sin(a.heading)*speed*dt);
-   const moved=Math.hypot(a.x-ox,a.y-oy)>.01;
+   const travelled=Math.hypot(a.x-ox,a.y-oy);
+   a.distanceTravelled=(a.distanceTravelled||0)+travelled;
+   const moved=travelled>.01;
    a.age=(a.age||0)+dt*(moved?1+val('aging')/100:1)/50;
    // Finite energy: exactly one portion per successful feeding event.
    // A cell can feed again after 0.25 virtual days, even if it remains nearby.
@@ -219,7 +277,7 @@ function step(dt){
      a.progress-=val('repro');a.energy/=2;
      const p={x:clamp(a.x+Math.random()*12-6,10,750),y:clamp(a.y+Math.random()*12-6,10,510)};
      if(blocked(p.x,p.y,10)){p.x=a.x;p.y=a.y}
-     next.push({...a,id:nextId++,age:0,progress:0,generation:(a.generation||1)+1,...p,heading:Math.random()*Math.PI*2,fedOnce:a.fedOnce,fedSources:[...(a.fedSources||[])],feedCooldowns:{},color:a.color,birthDay:day,pushedUntil:0,stuckUntil:0});born++;
+     next.push({...a,id:nextId++,age:0,progress:0,generation:(a.generation||1)+1,...p,heading:Math.random()*Math.PI*2,fedOnce:a.fedOnce,fedSources:[...(a.fedSources||[])],feedCooldowns:{},color:a.color,birthDay:day,pushedUntil:0,stuckUntil:0,distanceTravelled:0,distanceTravelled:(a.distanceTravelled||0)*.5});born++;
    }
    if(a.age>=val('life')||a.energy<=0){dead++;continue}
    next.push(a);
@@ -228,7 +286,7 @@ function step(dt){
  // Exhausted sources disappear and are instantly forgotten by all cells.
  const before=sources.length;
  sources=sources.filter(s=>s.remaining>0);
- if(sources.length!==before){sourceVersion++;for(const a of cells){a.known=null;a.feedCooldowns=Object.fromEntries(Object.entries(a.feedCooldowns||{}).filter(([id])=>sources.some(s=>String(s.id)===id)))}}
+ if(sources.length!==before){sourceVersion++;navCache.clear();for(const a of cells){a.known=null;a.feedCooldowns=Object.fromEntries(Object.entries(a.feedCooldowns||{}).filter(([id])=>sources.some(s=>String(s.id)===id)))}}
  resolveEncirclements();resolveCellCollisions(dt);day+=dt;
 }
 function frame(t){if(!last)last=t;let elapsed=Math.min(.2,(t-last)/1000);last=t;if(running){acc+=elapsed*val("tempo");while(acc>=.05){step(.05);acc-=.05}}draw();requestAnimationFrame(frame)}
@@ -236,8 +294,8 @@ async function load(){
  running=false;
  try{
   const r=await fetch('./state.json?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);
-  const s=await r.json();day=s.day||0;cells=s.cells.map(a=>({...a,known:null,age:a.age||0,fedOnce:false,fedSources:[],feedCooldowns:{},color:newColor(),birthDay:day-(a.age||0),pushedUntil:0,stuckUntil:0}));
- born=s.born||0;dead=s.dead||0;nextId=s.next_id||101;sources=[];sourceVersion++;huntTeams.clear();
+  const s=await r.json();day=s.day||0;cells=s.cells.map(a=>({...a,known:null,age:a.age||0,fedOnce:false,fedSources:[],feedCooldowns:{},color:newColor(),birthDay:day-(a.age||0),pushedUntil:0,stuckUntil:0,distanceTravelled:0}));
+ born=s.born||0;dead=s.dead||0;nextId=s.next_id||101;sources=[];sourceVersion++;navCache.clear();huntTeams.clear();
   $('updated').textContent='Сохранено: '+new Date(s.updated).toLocaleString('ru-RU');
   $('mode').textContent='Загружен снимок GitHub. Добавь источники и нажми «Начать локальную симуляцию».';
   draw();
@@ -252,7 +310,7 @@ function addColony(){
 }
 $('restart').onclick=addColony;
 $('inspectMode').onclick=()=>{inspectMode=!inspectMode;$('inspectMode').textContent=inspectMode?'Режим: просмотр клеток':'Режим: добавление источников'};
-$('removeSource').onclick=()=>{sources=[];sourceVersion++;for(const a of cells)a.known=null;$('detail').textContent='Все источники энергии отключены. Клетки ищут пищу.';draw()};
+$('removeSource').onclick=()=>{sources=[];sourceVersion++;navCache.clear();for(const a of cells)a.known=null;$('detail').textContent='Все источники энергии отключены. Клетки ищут пищу.';draw()};
 $('power').oninput=()=>{$('powerValue').textContent=$('power').value+'%';draw()};$('refresh').onclick=load;$('start').onclick=()=>{running=true;$('mode').textContent='Локальная симуляция идёт в браузере; GitHub не изменяется.'};$('pause').onclick=()=>{running=false;$('mode').textContent='Локальная симуляция на паузе.'};
 c.addEventListener('click',e=>{
  const r=c.getBoundingClientRect(),x=(e.clientX-r.left)*760/r.width,y=(e.clientY-r.top)*520/r.height;
@@ -262,7 +320,7 @@ c.addEventListener('click',e=>{
    $('detail').textContent=closest?JSON.stringify(closest,null,2):'Рядом нет клетки';
  }else{
    const s={id:sourceVersion++,x,y,power:Number($('power').value),firstId:null,remaining:30};
-   sources.push(s);
+   sources.push(s);navCache.clear();
    $('detail').textContent='Добавлен источник №'+sources.length+' ('+s.power+'%).';
    draw();
  }
