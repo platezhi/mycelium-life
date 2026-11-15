@@ -258,7 +258,7 @@ function cellSpeech(){
  // A plea consumes one full virtual day of the cell's remaining lifespan.
  a.birthDay-=1;
  pendingWish={cellId:a.id,type};
- showWish('💬 Клетка №'+a.id+': «'+request+'» (цена просьбы — 1 год жизни*)',true);
+ showWish('💬 Клетка №'+a.id+': «'+request+'» (цена просьбы — 1 год жизни)',true);
 }
 function answerWish(yes){
  if(!pendingWish)return;
