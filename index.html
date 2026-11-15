@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id),canvas=$('world'),ctx=canvas.getContext(
 let cell,sources=[],branches=[],nodes=[],nextSourceId=0,angle=.7,pitch=.38,zoom=1,drag=null,pointers=new Map(),lastPinch=0,last=performance.now(),uiTimer=0,requestTime=0,prevMood='',lastMessage='',messageIndex=0;
 const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z),randPos=()=>({x:rnd(-75,75),y:rnd(-75,75),z:rnd(-75,75)});
 function say(t){if(t!==lastMessage){$('words').textContent=t;lastMessage=t}}
-function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,mass:1,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10)};sources=[];branches=[];nodes=[{x:0,y:0,z:0}];nextSourceId=0;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
+function init(){cell={p:{x:0,y:0,z:0},v:{x:.28,y:.18,z:.12},energy:65,experience:0,found:0,size:1,mass:1,elongation:0,age:0,starve:0,heading:0,memory:[],drift:rnd(0,10),wander:{x:rnd(-65,65),y:rnd(-65,65),z:rnd(-65,65)},nextWander:0};sources=[];branches=[];nodes=[{x:0,y:0,z:0}];nextSourceId=0;requestTime=0;prevMood='';messageIndex=0;lastMessage='';say('Я здесь. Что находится вокруг?');updateUI()}
 function project(p){const x=p.x*Math.cos(angle)-p.z*Math.sin(angle),z=p.x*Math.sin(angle)+p.z*Math.cos(angle),y=p.y*Math.cos(pitch)-z*Math.sin(pitch);const scale=Math.min(w,h)*.00255*zoom;return{x:w/2+x*scale,y:h/2-y*scale,scale}}
 function line(a,b,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
 function draw(){ctx.clearRect(0,0,w,h);const corners=[];for(const x of [-100,100])for(const y of [-100,100])for(const z of [-100,100])corners.push({x,y,z});const pp=corners.map(project);for(let i=0;i<8;i++)for(let j=i+1;j<8;j++){const d=dist(corners[i],corners[j]);if(Math.abs(d-200)<.01)line(pp[i],pp[j],'rgba(130,207,226,.48)',1)}
@@ -30,14 +30,16 @@ const coreRadius=Math.sqrt(Math.max(r*r*.34,r*r-lengthPixels*stemRadius*.62));
 const softness=Math.max(1.2,stemRadius*.85),fade=clamp(cell.energy/65,0,1);
 const pieces=segments.map(s=>({ax:s.a.x*density,ay:s.a.y*density,bx:s.b.x*density,by:s.b.y*density,id:s.id}));
 const rootX=root.x*density,rootY=root.y*density;
+const wobbleTime=cell.age,breath=1+.045*Math.sin(wobbleTime*2.2);
 function merge(a,b,k){const t=Math.max(k-Math.abs(a-b),0)/k;return Math.min(a,b)-t*t*k*.25}
 function field(x,y){
- let d=Math.hypot(x-rootX,y-rootY)-coreRadius;
+ const dx=x-rootX,dy=y-rootY,theta=Math.atan2(dy,dx);
+ let d=Math.hypot(dx,dy)-coreRadius*breath*(1+.035*Math.sin(theta*3+wobbleTime*1.3)+.025*Math.sin(theta*5-wobbleTime*.8));
  for(const s of pieces){
   const vx=s.bx-s.ax,vy=s.by-s.ay,len2=vx*vx+vy*vy;
   const t=len2?clamp(((x-s.ax)*vx+(y-s.ay)*vy)/len2,0,1):0;
   const px=s.ax+t*vx,py=s.ay+t*vy;
-  const thickness=stemRadius*(.88+.12*Math.sin(t*6.28+s.id*.7+cell.age*.4));
+  const thickness=stemRadius*(.88+.12*Math.sin(t*6.28+s.id*.7+cell.age*.9))*(1+.045*Math.sin(cell.age*2.1+s.id));
   const v=Math.hypot(x-px,y-py)-thickness;
   d=merge(d,v,softness);
  }
@@ -64,6 +66,16 @@ ctx.save();ctx.imageSmoothingEnabled=true;ctx.shadowColor='#73d8d0';ctx.shadowBl
 function chooseRequest(){const n=cell.experience;if(n<1)return ['Энергия?..','Здесь пусто. Можно немного энергии?','Я всё ещё ищу…'][messageIndex++%3];if(n<3)return ['Я помню, где нашла первый источник. Покажи мне ещё один?','Я научилась двигаться к светящейся энергии. Можно попробовать снова?','Мне трудно двигаться без энергии. Поможешь?'][messageIndex++%3];if(n<6)return ['Я стала длиннее и лучше выбираю направление. Дай мне новый источник — хочу проверить свой путь.','Я уже помню '+cell.found+' источника. Мне нужна энергия, чтобы продолжить исследование.','Каждый новый источник меняет мою форму. Мне хочется узнать, какой я стану дальше.'][messageIndex++%3];return ['Я исследовала '+cell.found+' источников и научилась точнее поворачивать. Мне не хватает энергии для следующего открытия.','Я сохранила свои маршруты и опыт. Создай новый источник, и я попробую добраться до него ещё эффективнее.','Я стала сложнее, но мир вокруг по-прежнему огромен. Поможешь мне продолжить путешествие?'][messageIndex++%3]}
 function step(dt){
 cell.age+=dt;cell.energy=Math.max(0,cell.energy-(sources.length?dt*.15:dt*(cell.energy>15?1.6:.7)));cell.starve=clamp((30-cell.energy)/30,0,1);
+// Autonomous locomotion continues even when there is no food. A target is periodically reselected.
+if(cell.age>=cell.nextWander||dist(cell.p,cell.wander)<12){cell.wander=randPos();cell.nextWander=cell.age+rnd(6,12)}
+const wanderTarget=sources.length?sources.reduce((a,b)=>dist(cell.p,a.p)<dist(cell.p,b.p)?a:b).p:cell.wander;
+const vx=wanderTarget.x-cell.p.x,vy=wanderTarget.y-cell.p.y,vz=wanderTarget.z-cell.p.z,vl=Math.hypot(vx,vy,vz)||1;
+const turn=Math.min(1,dt*1.1);cell.v.x+=(vx/vl-cell.v.x)*turn;cell.v.y+=(vy/vl-cell.v.y)*turn;cell.v.z+=(vz/vl-cell.v.z)*turn;
+const vm=Math.hypot(cell.v.x,cell.v.y,cell.v.z)||1;const speed=(sources.length?5:3.8)*(1-.55*cell.starve);
+const old={...cell.p};cell.p.x=clamp(cell.p.x+cell.v.x/vm*speed*dt,-85,85);cell.p.y=clamp(cell.p.y+cell.v.y/vm*speed*dt,-85,85);cell.p.z=clamp(cell.p.z+cell.v.z/vm*speed*dt,-85,85);
+// All growing tissue moves together with the body; active tips then seek their food.
+const move={x:cell.p.x-old.x,y:cell.p.y-old.y,z:cell.p.z-old.z};
+for(const branch of branches){branch.origin.x+=move.x;branch.origin.y+=move.y;branch.origin.z+=move.z;branch.tip.x+=move.x;branch.tip.y+=move.y;branch.tip.z+=move.z}
 // The first body is fixed as the root. Growth is permanent; only growing tips move.
 for(const branch of branches){
  const s=sources.find(v=>v.id===branch.id);
@@ -71,7 +83,7 @@ for(const branch of branches){
  const d=dist(branch.tip,s.p),rate=19*(1+Math.min(.7,cell.experience*.06));
  if(d>0){const step=Math.min(d,rate*dt);branch.tip.x+=(s.p.x-branch.tip.x)/d*step;branch.tip.y+=(s.p.y-branch.tip.y)/d*step;branch.tip.z+=(s.p.z-branch.tip.z)/d*step}
  if(dist(branch.tip,s.p)<2){const absorbed=Math.min(s.energy,dt*11);s.energy-=absorbed;cell.energy=clamp(cell.energy+absorbed*1.1,0,100);
- if(s.energy<=.001){sources.splice(sources.indexOf(s),1);branch.complete=false;cell.found++;cell.experience++;cell.memory.push({...s.p});cell.mass=Math.min(1.7,cell.mass+.035);cell.size=Math.sqrt(cell.mass);cell.elongation=Math.min(.7,cell.elongation+.02);requestTime=cell.age+7;say('Источник иссяк. Я немного пополнела и теперь втягиваю вытянутую часть тела. '+(sources.length?'Продолжаю тянуться к остальным.':'Жду новых источников.'))}}
+ if(s.energy<=.001){sources.splice(sources.indexOf(s),1);branch.complete=false;cell.found++;cell.experience++;cell.memory.push({...s.p});cell.mass=Math.min(1.7,cell.mass+.035);cell.size=Math.sqrt(cell.mass);cell.elongation=Math.min(.7,cell.elongation+.02);requestTime=cell.age+7;say('Источник иссяк. Я немного пополнела и теперь втягиваю вытянутую часть тела. '+(sources.length?'Продолжаю тянуться к остальным.':'Продолжаю плавать и искать новые источники.'))}}
 }
 if(!sources.length&&cell.energy<34&&cell.age>requestTime){say(chooseRequest());requestTime=cell.age+clamp(13-cell.experience*.5,6,13)}
 }
